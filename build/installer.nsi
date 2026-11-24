@@ -7,7 +7,10 @@
 !define PROJECT_DIR "H:\tmp\vert-cam-studio"
 
 Unicode true
-SetCompressor /SOLID lzma
+; 用非 solid 的 zlib 压缩：SOLID lzma 在部分机器上解压超大载荷(300MB+)到临时目录时
+; 会触发 "Error writing temporary file. Make sure your temp folder is valid."
+; zlib 分块压缩对临时目录压力小、兼容性更好，代价是安装包略大。
+SetCompressor zlib
 
 !include "MUI2.nsh"
 

@@ -85,6 +85,7 @@ npm run dist       # 输出到 release/，含 NSIS 安装包与便携版
 >
 > 产物：`release/垂直摄像头工作室 Setup 0.1.0.exe`（含完整程序数据、桌面/开始菜单快捷方式、注册表卸载信息）。
 > 注意：不要对编译好的 NSIS 安装包再跑 rcedit——它会重写 PE 头并截断尾部附加的安装数据。
+> 压缩方式：脚本用 `SetCompressor zlib`（非 solid）。早期用 `SetCompressor /SOLID lzma` 时，部分机器运行安装包弹出 `NSIS Error: Error writing temporary file. Make sure your temp folder is valid.`——SOLID 压缩把 300MB+ 载荷压成单一数据流，解压时对临时目录压力和容错要求高；zlib 分块压缩兼容性更好，代价是安装包从 87MB 增至 120MB。
 
 产物清单（`release/`）：
 
