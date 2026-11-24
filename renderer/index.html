@@ -22,6 +22,7 @@
       </label>
       <button id="btnRefreshDevices" class="btn ghost" title="重新扫描设备">刷新</button>
       <span id="camStatus" class="status-chip">未启动</span>
+      <button id="btnSettings" class="btn ghost" title="打开独立设置窗口">设置…</button>
     </div>
   </header>
 
@@ -58,12 +59,14 @@
 
     <!-- 右：裁剪工作台 -->
     <section class="pane">
-      <h2 class="pane-title">裁剪 / 缩放 / 旋转</h2>
+      <div class="pane-heading">
+        <h2 class="pane-title">裁剪 / 缩放 / 旋转</h2>
+        <div id="modeBadge" class="mode-badge select">✂ 截取模式</div>
+      </div>
 
       <div id="cropStage" class="crop-stage">
         <img id="cropImage" alt="待裁剪画面" />
         <div id="cropEmpty" class="placeholder">还没有画面，先拍照或截图</div>
-        <div id="modeBadge" class="mode-badge select">✂ 截取模式</div>
       </div>
 
       <div class="pane-tools">
@@ -114,7 +117,6 @@
       <div class="save-bar">
         <button id="btnSave" class="btn primary big" title="快捷键：Ctrl+S">保存裁剪结果</button>
         <button id="btnRecapture" class="btn">重新拍摄</button>
-        <button id="btnSettings" class="btn ghost push-right" title="打开独立设置窗口">设置…</button>
       </div>
     </section>
   </main>
