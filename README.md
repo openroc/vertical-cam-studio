@@ -73,6 +73,19 @@ Copy-Item .\node_modules\electron\dist\* "$env:TEMP\elec-run\" -Recurse -Force
 npm run dist       # 输出到 release/，含 NSIS 安装包与便携版
 ```
 
+> **离线 / 受限环境备用打包**：若 `npm run dist` 在下载 Electron 或末尾“执行安装包生成卸载器”步骤卡住（无头/沙箱环境常见），可复用本地已解压的 Electron 运行时与 NSIS 工具，分两步生成安装包：
+>
+> ```bash
+> # 1) 生成免安装程序目录（electronDist 指向本地已解压的 electron-v38.3.0-win32-x64）
+> npx electron-builder --dir --win --x64 -c.electronDist="C:\Users\<user>\AppData\Local\Temp\elec-run"
+>
+> # 2) 用 NSIS 直接编译安装包（脚本内 PROJECT_DIR 按实际路径调整）
+> makensis build/installer.nsi
+> ```
+>
+> 产物：`release/垂直摄像头工作室 Setup 0.1.0.exe`（含完整程序数据、桌面/开始菜单快捷方式、注册表卸载信息）。
+> 注意：不要对编译好的 NSIS 安装包再跑 rcedit——它会重写 PE 头并截断尾部附加的安装数据。
+
 > 首次运行会请求摄像头权限，请点「允许」。若设备列表为空，先插好摄像头再点「刷新」。
 
 ### 自动自检（无需人工介入）
