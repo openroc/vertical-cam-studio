@@ -5,7 +5,17 @@ smoke/
 abtest/
 logs/
 captures/
+
 .npm-cache/
+.workbuddy/
+
 *.log
+*.png
+*.jpg
+
 .DS_Store
 Thumbs.db
+
+audit.cmd
+start.cmd
+start.ps1
