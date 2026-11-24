@@ -1255,6 +1255,7 @@ async function runSmokeTest() {
           return {
             ok: true,
             cards: document.querySelectorAll('.settings-card').length,
+            configDir: document.querySelector('#configDir') ? document.querySelector('#configDir').textContent : '',
             rolledBack: input.value === before,
             notBad: input.value !== bad
           };
@@ -1266,7 +1267,9 @@ async function runSmokeTest() {
       }
     })();
     const settingsWindowOk = !!(settingsWindowProbe && settingsWindowProbe.ok
-      && settingsWindowProbe.cards === 4
+      && settingsWindowProbe.cards === 5
+      && (settingsWindowProbe.configDir || '').length > 3
+      && settingsWindowProbe.configDir !== '（读取中…）' && settingsWindowProbe.configDir !== '（读取失败）'
       && settingsWindowProbe.rolledBack && settingsWindowProbe.notBad);
     console.log('[smoke] 设置窗口结果:', JSON.stringify(settingsWindowProbe));
 

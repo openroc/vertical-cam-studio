@@ -154,6 +154,13 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
   max-width: 320px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 设置页的配置目录要完整可读，不做省略 */
+.settings-card .config-dir {
+  display: block;
+  max-width: none;
+  white-space: normal;
+  word-break: break-all;
+}
 
 /* ---------------- 主区域 ---------------- */
 

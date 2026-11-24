@@ -1346,7 +1346,8 @@ async function init() {
   });
 
   const info = await api.appInfo();
-  $('#appInfo').textContent = `v${info.version} · ${info.platform} · 配置目录 ${info.userData}`;
+  // 配置目录较长，已移到设置页的「存储位置」卡片，状态栏只留版本与平台
+  $('#appInfo').textContent = `v${info.version} · ${info.platform}`;
 
   bindEvents();
   observePreviewSize();

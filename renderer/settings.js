@@ -151,6 +151,14 @@ function bindEvents() {
 
 async function init() {
   try {
+    const info = await api.appInfo();
+    if (info && info.userData) $('#configDir').textContent = info.userData;
+  } catch (err) {
+    $('#configDir').textContent = '（读取失败）';
+    console.warn('[settings] 读取配置目录失败:', err);
+  }
+
+  try {
     const saved = await api.getSettings();
     settings = Object.assign({}, saved || {});
     fillControls();
