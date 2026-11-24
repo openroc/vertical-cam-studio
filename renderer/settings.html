@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self';" />
+  <title>设置 · 垂直摄像头工作室</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="settings-body">
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>设置</h1>
+    </div>
+    <div class="topbar-right">
+      <span id="saveStatus" class="status-chip">修改后自动保存</span>
+      <button id="btnCloseSettings" class="btn ghost" title="关闭设置（Esc）">关闭</button>
+    </div>
+  </header>
+
+  <main class="settings-page">
+    <section class="settings-card">
+      <h2>输出格式</h2>
+      <div class="settings-grid">
+        <label class="field">
+          <span>格式</span>
+          <select id="formatSelect">
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG（无损、体积大）</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>JPEG 质量 <b id="qualityValue">92</b>%</span>
+          <input id="qualityRange" type="range" min="50" max="100" step="1" />
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-card">
+      <h2>文件名</h2>
+      <div class="settings-grid">
+        <label class="field">
+          <span>文件名前缀</span>
+          <input id="prefixInput" type="text" placeholder="shot" />
+        </label>
+        <label class="field">
+          <span>文件名模板</span>
+          <input id="templateInput" type="text" placeholder="{prefix}_{timestamp}" />
+        </label>
+      </div>
+      <p class="hint">模板占位符：<code>{prefix}</code> <code>{timestamp}</code> <code>{date}</code> <code>{time}</code> <code>{n}</code>。<code>{n}</code> 为本次运行内的保存序号，重启归零。</p>
+    </section>
+
+    <section class="settings-card">
+      <h2>拍照行为</h2>
+      <label class="field checkbox">
+        <input id="autoSaveCheck" type="checkbox" />
+        <span>拍照后自动保存（跳过手动裁剪）</span>
+      </label>
+    </section>
+
+    <section class="settings-card">
+      <h2>白板与识别</h2>
+      <div class="settings-grid">
+        <label class="field checkbox">
+          <input id="whiteboardCheck" type="checkbox" />
+          <span>白板模式（保存时转黑白并增强对比度）</span>
+        </label>
+        <label class="field">
+          <span>白板强度 <b id="whiteboardValue">1.8</b>×</span>
+          <input id="whiteboardRange" type="range" min="100" max="320" step="5" />
+        </label>
+        <label class="field checkbox">
+          <input id="binarizeCheck" type="checkbox" />
+          <span>二值化（Otsu 自动阈值，白板手写识别更佳）</span>
+        </label>
+        <label class="field checkbox">
+          <input id="whiteboardSoftCheck" type="checkbox" checked />
+          <span>保留抗锯齿边缘（推荐：避免细笔画被识别成方括号 []）</span>
+        </label>
+        <label class="field stack">
+          <span>导出倍率（识别用）</span>
+          <select id="exportScaleSelect">
+            <option value="auto">自动（小图补到 ~1200px，实测最准）</option>
+            <option value="1">1×（原尺寸）</option>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">白板相关设置会实时反映在主界面的实时预览上；保存时按这里的配置处理图片。</p>
+    </section>
+  </main>
+  <script src="settings.js"></script>
+</body>
+</html>

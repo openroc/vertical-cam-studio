@@ -5,6 +5,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   patchSettings: (patch) => ipcRenderer.invoke('settings:patch', patch),
+  openSettings: () => ipcRenderer.invoke('settings:open'),
+  /** 设置变更广播；返回取消订阅函数，避免渲染层重复监听 */
+  onSettingsChanged: (callback) => {
+    const listener = (_event, next) => callback(next);
+    ipcRenderer.on('settings:changed', listener);
+    return () => ipcRenderer.removeListener('settings:changed', listener);
+  },
 
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 

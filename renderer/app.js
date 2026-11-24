@@ -927,12 +927,16 @@ function updatePreviewFilter() {
 /* 保存                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 文件名配置现在由独立设置窗口维护，写回主进程的 settings.json；
+ * 主界面只认 state.settings（已校验的权威值），不再从已移除的输入框读取。
+ */
 function currentFilenameTemplate() {
-  return $('#templateInput').value.trim() || state.settings.filenameTemplate || '{prefix}_{timestamp}';
+  return state.settings.filenameTemplate || '{prefix}_{timestamp}';
 }
 
 function currentPrefix() {
-  return ($('#prefixInput').value.trim() || state.settings.prefix || 'shot');
+  return state.settings.prefix || 'shot';
 }
 
 /**
@@ -1128,69 +1132,7 @@ function bindEvents() {
     else toast('尚未选择输出目录', 'err');
   });
 
-  // 保存设置
-  $('#formatSelect').addEventListener('change', (e) => {
-    state.settings.format = e.target.value === 'png' ? 'png' : 'jpeg';
-    patchSettings({ format: state.settings.format });
-  });
-  // 拖动时先更新内存里的值（保存立即生效），落盘做防抖，避免一次拖动写十几次磁盘
-  let qualityPersistTimer = null;
-  $('#qualityRange').addEventListener('input', (e) => {
-    const v = Number(e.target.value) / 100;
-    state.settings.quality = v;
-    $('#qualityValue').textContent = e.target.value;
-    clearTimeout(qualityPersistTimer);
-    qualityPersistTimer = setTimeout(() => patchSettings({ quality: v }), 400);
-  });
-  $('#qualityRange').addEventListener('change', (e) => {
-    const v = Number(e.target.value) / 100;
-    state.settings.quality = v;
-    clearTimeout(qualityPersistTimer);
-    patchSettings({ quality: v });
-  });
-  $('#prefixInput').addEventListener('change', (e) => patchSettings({ prefix: e.target.value }));
-  $('#templateInput').addEventListener('change', (e) => patchSettings({ filenameTemplate: e.target.value }));
-  $('#autoSaveCheck').addEventListener('change', (e) => patchSettings({ autoSaveAfterCapture: e.target.checked }));
-
-  // 白板模式
-  $('#whiteboardCheck').addEventListener('change', (e) => {
-    state.settings.whiteboard = e.target.checked;
-    patchSettings({ whiteboard: e.target.checked });
-    updatePreviewFilter();
-  });
-  // 与质量滑块保持一致：拖动过程中就更新内存值并刷新预览滤镜，
-  // 否则拖到一半时预览还是旧强度，松手前保存也会用旧值。
-  let contrastPersistTimer = null;
-  $('#whiteboardRange').addEventListener('input', (e) => {
-    const contrast = Number(e.target.value) / 100;
-    state.settings.whiteboardContrast = contrast;
-    $('#whiteboardValue').textContent = contrast.toFixed(2);
-    updatePreviewFilter();
-    clearTimeout(contrastPersistTimer);
-    contrastPersistTimer = setTimeout(() => patchSettings({ whiteboardContrast: contrast }), 400);
-  });
-  $('#whiteboardRange').addEventListener('change', (e) => {
-    const contrast = Number(e.target.value) / 100;
-    state.settings.whiteboardContrast = contrast;
-    clearTimeout(contrastPersistTimer);
-    patchSettings({ whiteboardContrast: contrast });
-    updatePreviewFilter();
-  });
-  $('#binarizeCheck').addEventListener('change', (e) => {
-    state.settings.binarize = e.target.checked;
-    patchSettings({ binarize: e.target.checked });
-    updatePreviewFilter();
-  });
-  $('#whiteboardSoftCheck').addEventListener('change', (e) => {
-    state.settings.whiteboardSoft = e.target.checked;
-    patchSettings({ whiteboardSoft: e.target.checked });
-  });
-  $('#exportScaleSelect').addEventListener('change', (e) => {
-    state.settings.exportScale = e.target.value;
-    patchSettings({ exportScale: e.target.value });
-  });
-
-  // 保存 / 重拍
+  // 保存 / 重拍 / 设置
   $('#btnSave').addEventListener('click', () => saveCurrent());
   $('#btnRecapture').addEventListener('click', () => {
     destroyCropper();
@@ -1198,6 +1140,9 @@ function bindEvents() {
     $('#cropEmpty').style.display = 'flex';
     cropImage.removeAttribute('src');
     setFooter('已清空裁剪区');
+  });
+  $('#btnSettings').addEventListener('click', () => {
+    api.openSettings().catch((err) => toast(`打开设置失败：${err.message || err}`, 'err'));
   });
 
   // 快捷键
@@ -1290,26 +1235,12 @@ function syncRotationButtons() {
 function syncControlsFromSettings(only) {
   const want = (key) => !only || only.indexOf(key) >= 0;
 
-  if (want('format')) $('#formatSelect').value = state.settings.format === 'png' ? 'png' : 'jpeg';
-  if (want('quality')) {
-    $('#qualityRange').value = Math.round((state.settings.quality ?? 0.92) * 100);
-    $('#qualityValue').textContent = $('#qualityRange').value;
-  }
-  if (want('prefix')) $('#prefixInput').value = state.settings.prefix || 'shot';
-  if (want('filenameTemplate')) $('#templateInput').value = state.settings.filenameTemplate || '{prefix}_{timestamp}';
-  if (want('autoSaveAfterCapture')) $('#autoSaveCheck').checked = !!state.settings.autoSaveAfterCapture;
-  if (want('whiteboard')) $('#whiteboardCheck').checked = !!state.settings.whiteboard;
-  if (want('whiteboardContrast')) {
-    $('#whiteboardRange').value = Math.round((state.settings.whiteboardContrast ?? 1.8) * 100);
-    $('#whiteboardValue').textContent = (Number($('#whiteboardRange').value) / 100).toFixed(2);
-  }
-  if (want('binarize')) $('#binarizeCheck').checked = !!state.settings.binarize;
-  if (want('whiteboardSoft')) $('#whiteboardSoftCheck').checked = state.settings.whiteboardSoft !== false;
-  if (want('exportScale')) $('#exportScaleSelect').value = String(state.settings.exportScale ?? 'auto');
+  // 保存设置已迁到独立设置窗口；主界面只同步这里仍然可见的控件
   if (want('mirror')) $('#btnMirror').classList.toggle('active', !!state.settings.mirror);
   if (want('rotation')) syncRotationButtons();
   if (want('outputDir')) renderOutputDir();
-  if (want('whiteboard') || want('whiteboardContrast')) updatePreviewFilter();
+  // 白板 / 二值化 / 强度由设置窗口修改后经广播同步过来，预览滤镜要跟着刷新
+  if (want('whiteboard') || want('whiteboardContrast') || want('binarize')) updatePreviewFilter();
 }
 
 function renderOutputDir() {
@@ -1330,6 +1261,13 @@ async function init() {
 
   // syncControlsFromSettings() 里已经包含 renderOutputDir() 与 updatePreviewFilter()
   syncControlsFromSettings();
+
+  // 独立设置窗口改动后，主进程会广播权威设置；本地副本跟着更新并刷新预览
+  api.onSettingsChanged((next) => {
+    if (!next) return;
+    Object.assign(state.settings, next);
+    syncControlsFromSettings();
+  });
 
   const info = await api.appInfo();
   $('#appInfo').textContent = `v${info.version} · ${info.platform} · 配置目录 ${info.userData}`;

@@ -5,7 +5,7 @@
  * 从 main.js 拆出以降低单体文件体积；宿主依赖全部通过 createProbes 注入。
  * getMainWindow() 用 getter 而非快照，兼容窗口重建。
  */
-function createProbes({ app, fs, path, getMainWindow, flushUsage, usageFile, usageLogFile }) {
+function createProbes({ app, BrowserWindow, fs, path, getMainWindow, flushUsage, usageFile, usageLogFile }) {
 
 /* ------------------------------------------------------------------ */
 /* --abtest：生成白板管线的各阶段图像，供本地 VLM 做 A/B OCR 对照      */
@@ -979,8 +979,10 @@ async function runSmokeTest() {
 
       // 2) 松开 Ctrl 后，普通左键拖出一个新选区
       //    A) 起点落在图片上（常见操作）
-      const ax0 = canvas.left + 20;
-      const ay0 = Math.max(canvas.top, 0) + 20;
+      // 平移后 canvas.left 可能为负（图片左侧移出容器），起点必须夹在容器内，
+      // 否则 PointerEvent 会落在容器外被 clamp，误报「选区不跟手」。
+      const ax0 = Math.max(canvas.left + 20, 20);
+      const ay0 = Math.max(canvas.top + 20, 20);
       const ax1 = ax0 + 200;
       const ay1 = ay0 + 140;
       PE('pointerdown', cropper.container, rect.left + ax0, rect.top + ay0);
@@ -1170,30 +1172,25 @@ async function runSmokeTest() {
     console.log('[smoke] 设置回写结果:', JSON.stringify(settingsProbe));
     const settingsOk = !!(settingsProbe && settingsProbe.normalized);
 
-    // 回归探针：主进程**拒绝**的值必须从界面回滚。
-    // 否则输入框会停在一个根本没生效的坏值上，用户会误以为「已保存」。
+    // 回归探针：主进程**拒绝**的值不能进入渲染层状态，且必须返回 rejected 列表。
+    // 保存设置已迁到独立窗口，界面回滚由设置页自己的探针验证。
     const rejectProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
-      const input = document.querySelector('#prefixInput');
       const before = window.__wb.getSettings().prefix;
       const tooLong = 'x'.repeat(200);   // 超过 60 字符上限，主进程必定拒绝
       try {
-        input.value = tooLong;
-        await window.__wb.patchSettings({ prefix: tooLong });
+        const res = await window.api.patchSettings({ prefix: tooLong });
         const after = window.__wb.getSettings().prefix;
-        const shown = input.value;
         return {
           stateKeptOld: after === before,
-          uiRolledBack: shown === before,
-          uiNotBad: shown !== tooLong
+          rejected: !!(res && Array.isArray(res.rejected) && res.rejected.indexOf('prefix') >= 0)
         };
       } finally {
-        await window.__wb.patchSettings({ prefix: before });
-        input.value = before;
+        await window.api.patchSettings({ prefix: before });
       }
     })()`);
 
-    console.log('[smoke] 拒绝回滚结果:', JSON.stringify(rejectProbe));
-    const rejectOk = !!(rejectProbe && rejectProbe.stateKeptOld && rejectProbe.uiRolledBack && rejectProbe.uiNotBad);
+    console.log('[smoke] 拒绝校验结果:', JSON.stringify(rejectProbe));
+    const rejectOk = !!(rejectProbe && rejectProbe.stateKeptOld && rejectProbe.rejected);
 
     // 回归探针：UI 统计从渲染层 send 到主进程，并落到本地两个文件
     const usageProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
@@ -1223,6 +1220,46 @@ async function runSmokeTest() {
     const shotPath = path.join(outDir, 'screenshot.png');
     fs.writeFileSync(shotPath, img.toPNG());
 
+    // 回归探针：独立设置窗口能打开，控件齐全，且被拒绝的值会从控件回滚
+    const settingsWindowProbe = await (async () => {
+      try {
+        const opened = await getMainWindow().webContents.executeJavaScript(`window.api.openSettings()`);
+        const win = BrowserWindow.getAllWindows().find((w) => w !== getMainWindow() && !w.isDestroyed());
+        if (!opened || !opened.ok || !win) return { ok: false, reason: '窗口未创建' };
+        if (win.webContents.isLoading()) {
+          await new Promise((resolve) => win.webContents.once('did-finish-load', resolve));
+        }
+        const result = await win.webContents.executeJavaScript(`(async () => {
+          const input = document.querySelector('#prefixInput');
+          if (!input) return { ok: false, reason: '缺少 prefixInput' };
+          for (let i = 0; i < 30 && !input.value; i += 1) {
+            await new Promise((r) => setTimeout(r, 100));
+          }
+          const before = input.value;
+          const bad = 'x'.repeat(200);
+          input.value = bad;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          for (let i = 0; i < 30 && input.value === bad; i += 1) {
+            await new Promise((r) => setTimeout(r, 100));
+          }
+          return {
+            ok: true,
+            cards: document.querySelectorAll('.settings-card').length,
+            rolledBack: input.value === before,
+            notBad: input.value !== bad
+          };
+        })()`);
+        win.close();
+        return result;
+      } catch (err) {
+        return { ok: false, reason: err.message };
+      }
+    })();
+    const settingsWindowOk = !!(settingsWindowProbe && settingsWindowProbe.ok
+      && settingsWindowProbe.cards === 4
+      && settingsWindowProbe.rolledBack && settingsWindowProbe.notBad);
+    console.log('[smoke] 设置窗口结果:', JSON.stringify(settingsWindowProbe));
+
     const report = {
       probe,
       saveResult,
@@ -1242,6 +1279,8 @@ async function runSmokeTest() {
       settingsOk,
       rejectProbe,
       rejectOk,
+      settingsWindowProbe,
+      settingsWindowOk,
       usageProbe,
       usageFilesOk,
       usageOk,
@@ -1252,10 +1291,10 @@ async function runSmokeTest() {
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
     const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && whiteboardOk
-      && reloadOk && settingsOk && rejectOk && usageOk;
+      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
-      fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk, allOk
+      fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk, settingsWindowOk, allOk
     }));
     app.exit(allOk ? 0 : 2);
   } catch (err) {

@@ -27,6 +27,7 @@ const AUDIT_COMPARE = (() => {
 })();
 
 let mainWindow = null;
+let settingsWindow = null;
 let settings = null;
 // 开发任务进行中时不允许关窗口：否则 window-all-closed 会让整批任务静默中断
 let devJobRunning = false;
@@ -160,6 +161,7 @@ function appendUsageLog(t, id) {
 
 const probes = require('./dev/probes.js').createProbes({
   app,
+  BrowserWindow,
   fs,
   path,
   getMainWindow: () => mainWindow,
@@ -240,6 +242,9 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     console.log('[window] closed');
+    // 主窗口关闭时一并关掉设置窗口，避免留下孤儿窗口让应用无法退出
+    if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close();
+    settingsWindow = null;
     mainWindow = null;
   });
 
@@ -257,6 +262,48 @@ function createWindow() {
     }
     return { action: 'deny' };
   });
+}
+
+/** 打开（或聚焦）独立的设置窗口；设置页与主界面通过 settings:changed 广播保持一致 */
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return { ok: true, created: false };
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 620,
+    height: 720,
+    minWidth: 480,
+    minHeight: 520,
+    parent: mainWindow || undefined,
+    backgroundColor: '#12141a',
+    title: '设置 · 垂直摄像头工作室',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged,
+      spellcheck: false
+    }
+  });
+  settingsWindow.setMenu(null);
+  settingsWindow.loadFile(
+    path.join(__dirname, '..', 'renderer', 'settings.html'),
+    IS_DEV_TOOLS ? { query: { vcsdev: '1' } } : {}
+  );
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+  return { ok: true, created: true };
+}
+
+/** 设置变更后通知所有页面，保证主界面与设置窗口的状态不漂移 */
+function broadcastSettings() {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('settings:changed', settings);
+  }
 }
 
 app.whenReady().then(() => {
@@ -339,6 +386,7 @@ async function writeUniqueFile(dir, baseName, ext, buffer) {
 /* ------------------------------------------------------------------ */
 
 ipcMain.handle('settings:get', () => settings);
+ipcMain.handle('settings:open', () => openSettingsWindow());
 
 /** UI 按钮埋点：渲染层 fire-and-forget，主进程校验 identifier 后本地落盘 */
 ipcMain.on('stats:button', (_e, rawId) => {
@@ -403,7 +451,10 @@ ipcMain.handle('settings:patch', (_e, patch) => {
   }
   if (rejected.length) console.warn('[settings] 拒绝非法取值:', rejected.join(', '));
   // 全被拒绝或提交的就是当前值时不落盘，避免无谓的磁盘写入
-  if (changed) persistSettings();
+  if (changed) {
+    persistSettings();
+    broadcastSettings();
+  }
   return { settings, rejected };
 });
 

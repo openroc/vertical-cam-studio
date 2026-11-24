@@ -113,64 +113,10 @@
         </div>
       </div>
 
-      <details class="settings">
-        <summary>保存设置</summary>
-        <div class="settings-grid">
-          <label class="field">
-            <span>格式</span>
-            <select id="formatSelect">
-              <option value="jpeg">JPEG</option>
-              <option value="png">PNG（无损、体积大）</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>JPEG 质量 <b id="qualityValue">92</b>%</span>
-            <input id="qualityRange" type="range" min="50" max="100" step="1" />
-          </label>
-          <label class="field">
-            <span>文件名前缀</span>
-            <input id="prefixInput" type="text" placeholder="shot" />
-          </label>
-          <label class="field">
-            <span>文件名模板</span>
-            <input id="templateInput" type="text" placeholder="{prefix}_{timestamp}" />
-          </label>
-          <label class="field checkbox">
-            <input id="autoSaveCheck" type="checkbox" />
-            <span>拍照后自动保存（跳过手动裁剪）</span>
-          </label>
-          <label class="field checkbox">
-            <input id="whiteboardCheck" type="checkbox" />
-            <span>白板模式（保存时转黑白并增强对比度）</span>
-          </label>
-          <label class="field">
-            <span>白板强度 <b id="whiteboardValue">1.8</b>×</span>
-            <input id="whiteboardRange" type="range" min="100" max="320" step="5" />
-          </label>
-          <label class="field checkbox">
-            <input id="binarizeCheck" type="checkbox" />
-            <span>二值化（Otsu 自动阈值，白板手写识别更佳）</span>
-          </label>
-          <label class="field">
-            <span>导出倍率（识别用）</span>
-            <select id="exportScaleSelect">
-              <option value="auto">自动（小图补到 ~1200px，实测最准）</option>
-              <option value="1">1×（原尺寸）</option>
-              <option value="2">2×</option>
-              <option value="3">3×</option>
-            </select>
-          </label>
-          <label class="field checkbox">
-            <input id="whiteboardSoftCheck" type="checkbox" checked />
-            <span>保留抗锯齿边缘（推荐：避免细笔画被识别成方括号 []）</span>
-          </label>
-        </div>
-        <p class="hint">模板占位符：<code>{prefix}</code> <code>{timestamp}</code> <code>{date}</code> <code>{time}</code> <code>{n}</code></p>
-      </details>
-
       <div class="save-bar">
         <button id="btnSave" class="btn primary big" title="快捷键：Ctrl+S">保存裁剪结果</button>
         <button id="btnRecapture" class="btn">重新拍摄</button>
+        <button id="btnSettings" class="btn ghost push-right" title="打开独立设置窗口">设置…</button>
       </div>
     </section>
   </main>
