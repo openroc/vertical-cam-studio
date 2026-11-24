@@ -217,14 +217,16 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
 }
 .crop-stage img { display: block; max-width: 100%; max-height: 100%; }
 
-/* 交互模式提示：按住 Ctrl = 拖动画面，松开 = 拉选取框 */
+/* 交互模式提示：hover 徽标显示操作说明 */
 .mode-badge {
+  position: relative;
   padding: 4px 11px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .3px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: help;
   user-select: none;
   transition: background .12s, border-color .12s, color .12s;
   background: rgba(76, 141, 255, .16);
@@ -235,6 +237,36 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
   background: rgba(245, 166, 35, .18);
   border-color: rgba(245, 166, 35, .55);
   color: #ffd9a0;
+}
+.mode-badge::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(340px, 60vw);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1c2030;
+  border: 1px solid var(--bg-line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity .12s, transform .12s, visibility .12s;
+  pointer-events: none;
+}
+.mode-badge:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 /* 移动画面模式 / 拖动时的光标反馈 */
