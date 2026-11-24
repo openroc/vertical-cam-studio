@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self';" />
+  <title>垂直摄像头工作室</title>
+  <link rel="stylesheet" href="vendor/cropper.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>垂直摄像头工作室</h1>
+    </div>
+
+    <div class="topbar-right">
+      <label class="field">
+        <span>摄像头</span>
+        <select id="deviceSelect" title="选择摄像头设备"></select>
+      </label>
+      <button id="btnRefreshDevices" class="btn ghost" title="重新扫描设备">刷新</button>
+      <span id="camStatus" class="status-chip">未启动</span>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <div class="group" role="group" aria-label="旋转校正">
+      <span class="group-label">物理旋转校正</span>
+      <button class="btn rot" data-rot="0">0°</button>
+      <button class="btn rot" data-rot="90">90°</button>
+      <button class="btn rot" data-rot="180">180°</button>
+      <button class="btn rot" data-rot="270">270°</button>
+    </div>
+
+    <div class="group">
+      <span class="group-label">画面</span>
+      <button id="btnMirror" class="btn">镜像</button>
+      <button id="btnShot" class="btn primary" title="快捷键：空格">拍照</button>
+      <button id="btnScreenShot" class="btn" title="截取鼠标所在显示器（多屏时先把鼠标移到目标屏幕）">屏幕截图</button>
+      <label class="btn" for="fileInput" data-stat="importImage" title="导入本地图片进行裁剪">导入图片</label>
+      <input id="fileInput" type="file" accept="image/*" hidden />
+    </div>
+
+    <div class="group push-right">
+      <span class="group-label">输出目录</span>
+      <code id="outputDir" class="path">（未设置）</code>
+      <button id="btnPickFolder" class="btn">选择…</button>
+      <button id="btnOpenFolder" class="btn ghost">打开</button>
+    </div>
+  </section>
+
+  <main class="panes">
+    <!-- 左：摄像头实时预览 -->
+    <section class="pane">
+      <h2 class="pane-title">实时预览</h2>
+      <div id="previewStage" class="preview-stage">
+        <div id="previewRot" class="preview-rot">
+          <video id="video" playsinline muted autoplay></video>
+        </div>
+        <div id="previewPlaceholder" class="placeholder">点击「刷新」选择摄像头</div>
+      </div>
+      <p class="hint">摄像头物理竖装时，把旋转校正设为 90° / 270° 即可摆正画面；该校正会同时应用到拍照出图。</p>
+    </section>
+
+    <!-- 右：裁剪工作台 -->
+    <section class="pane">
+      <h2 class="pane-title">裁剪 / 缩放 / 旋转</h2>
+
+      <div id="cropStage" class="crop-stage">
+        <img id="cropImage" alt="待裁剪画面" />
+        <div id="cropEmpty" class="placeholder">还没有画面，先拍照或截图</div>
+        <div id="modeBadge" class="mode-badge select">✂ 截取模式</div>
+      </div>
+
+      <p class="hint">
+        <b>按住 Ctrl</b> + 拖动 = 拖动画面（平移）；<b>松开 Ctrl</b> 拖动 = 拉选取框；拖选区边角控制点可微调大小。
+      </p>
+
+      <div class="crop-tools">
+        <div class="group">
+          <span class="group-label">选区</span>
+          <button id="btnZoomReset" class="btn ghost" title="复位并适应窗口">复位</button>
+        </div>
+
+        <div class="group">
+          <span class="group-label">缩放</span>
+          <button id="btnZoomOut" class="btn">－</button>
+          <button id="btnZoomIn" class="btn">＋</button>
+        </div>
+
+        <div class="group">
+          <span class="group-label">旋转</span>
+          <button id="btnRotL" class="btn">↺ 90°</button>
+          <button id="btnRotR" class="btn">↻ 90°</button>
+          <button id="btnFlipH" class="btn">水平翻转</button>
+        </div>
+
+        <div class="group">
+          <span class="group-label">比例</span>
+          <select id="aspectSelect">
+            <option value="free">自由</option>
+            <option value="16:9">16:9</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+            <option value="1:1">1:1</option>
+            <option value="original">原图</option>
+          </select>
+        </div>
+      </div>
+
+      <details class="settings">
+        <summary>保存设置</summary>
+        <div class="settings-grid">
+          <label class="field">
+            <span>格式</span>
+            <select id="formatSelect">
+              <option value="jpeg">JPEG</option>
+              <option value="png">PNG（无损、体积大）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>JPEG 质量 <b id="qualityValue">92</b>%</span>
+            <input id="qualityRange" type="range" min="50" max="100" step="1" />
+          </label>
+          <label class="field">
+            <span>文件名前缀</span>
+            <input id="prefixInput" type="text" placeholder="shot" />
+          </label>
+          <label class="field">
+            <span>文件名模板</span>
+            <input id="templateInput" type="text" placeholder="{prefix}_{timestamp}" />
+          </label>
+          <label class="field checkbox">
+            <input id="autoSaveCheck" type="checkbox" />
+            <span>拍照后自动保存（跳过手动裁剪）</span>
+          </label>
+          <label class="field checkbox">
+            <input id="whiteboardCheck" type="checkbox" />
+            <span>白板模式（保存时转黑白并增强对比度）</span>
+          </label>
+          <label class="field">
+            <span>白板强度 <b id="whiteboardValue">1.8</b>×</span>
+            <input id="whiteboardRange" type="range" min="100" max="320" step="5" />
+          </label>
+          <label class="field checkbox">
+            <input id="binarizeCheck" type="checkbox" />
+            <span>二值化（Otsu 自动阈值，白板手写识别更佳）</span>
+          </label>
+          <label class="field">
+            <span>导出倍率（识别用）</span>
+            <select id="exportScaleSelect">
+              <option value="auto">自动（小图补到 ~1200px，实测最准）</option>
+              <option value="1">1×（原尺寸）</option>
+              <option value="2">2×</option>
+              <option value="3">3×</option>
+            </select>
+          </label>
+          <label class="field checkbox">
+            <input id="whiteboardSoftCheck" type="checkbox" checked />
+            <span>保留抗锯齿边缘（推荐：避免细笔画被识别成方括号 []）</span>
+          </label>
+        </div>
+        <p class="hint">模板占位符：<code>{prefix}</code> <code>{timestamp}</code> <code>{date}</code> <code>{time}</code> <code>{n}</code></p>
+      </details>
+
+      <div class="save-bar">
+        <button id="btnSave" class="btn primary big" title="快捷键：Ctrl+S">保存裁剪结果</button>
+        <button id="btnRecapture" class="btn">重新拍摄</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="statusText">就绪</span>
+    <span id="appInfo" class="muted"></span>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="vendor/cropper.min.js"></script>
+  <script src="core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

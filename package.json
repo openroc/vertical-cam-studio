@@ -1,0 +1,48 @@
+{
+  "name": "vertical-cam-studio",
+  "productName": "垂直摄像头工作室",
+  "version": "0.1.0",
+  "private": true,
+  "description": "垂直摄像头拍照 / 屏幕截图 / 缩放旋转裁剪 / 保存到指定文件夹",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "postinstall": "node scripts/copy-vendor.mjs",
+    "vendor": "node scripts/copy-vendor.mjs",
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "smoke": "electron . --smoke",
+    "test": "node --test",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "cropperjs": "1.6.2",
+    "electron": "^38.3.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.local.verticalcamstudio",
+    "productName": "垂直摄像头工作室",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+release/
+renderer/vendor/
+smoke/
+abtest/
+logs/
+captures/
+.npm-cache/
+*.log
+.DS_Store
+Thumbs.db

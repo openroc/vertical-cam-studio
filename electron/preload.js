@@ -1,0 +1,27 @@
+'use strict';
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('api', {
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  patchSettings: (patch) => ipcRenderer.invoke('settings:patch', patch),
+
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
+
+  /**
+   * payload: { dataUrl, format, filenameTemplate, prefix, counter, outputDir? }
+   * outputDir 仅供 --smoke 自检使用，主进程只会接受应用目录内的路径。
+   */
+  saveImage: (payload) => ipcRenderer.invoke('image:save', payload),
+
+  captureScreen: () => ipcRenderer.invoke('screen:capture'),
+
+  openPath: (target) => ipcRenderer.invoke('shell:openPath', target),
+  showItemInFolder: (target) => ipcRenderer.invoke('shell:showItemInFolder', target),
+
+  appInfo: () => ipcRenderer.invoke('app:info'),
+
+  /** UI 使用统计：只上报稳定的按钮标识，写入本机 userData，不联网 */
+  trackButton: (id) => ipcRenderer.send('stats:button', id),
+  getUiUsage: () => ipcRenderer.invoke('stats:usage')
+});
