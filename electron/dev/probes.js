@@ -1281,16 +1281,28 @@ async function runSmokeTest() {
     const outputLayoutProbe = await getMainWindow().webContents.executeJavaScript(`(() => {
       const aspectGroup = document.querySelector('#aspectSelect')?.closest('.group');
       const openBtn = document.querySelector('#btnOpenFolder');
+      const saveBtn = document.querySelector('#btnSave');
+      const recaptureBtn = document.querySelector('#btnRecapture');
       const openInAspect = !!(aspectGroup && openBtn && aspectGroup.contains(openBtn));
+      const btnH = (el) => el ? Math.round(el.getBoundingClientRect().height) : -1;
+      const ordered = !!(openBtn && saveBtn && recaptureBtn
+        && openBtn.nextElementSibling === saveBtn && saveBtn.nextElementSibling === recaptureBtn);
+      const sameSize = btnH(openBtn) === btnH(saveBtn) && btnH(openBtn) === btnH(recaptureBtn);
       return {
         mainHasPickFolder: !!document.querySelector('#btnPickFolder'),
         mainHasOutputDir: !!document.querySelector('#outputDir'),
         openInAspect,
-        openIsSelectNextSibling: !!(openBtn && document.querySelector('#aspectSelect')?.nextElementSibling === openBtn)
+        openIsSelectNextSibling: !!(openBtn && document.querySelector('#aspectSelect')?.nextElementSibling === openBtn),
+        saveRecaptureInAspect: !!(aspectGroup && saveBtn && recaptureBtn
+          && aspectGroup.contains(saveBtn) && aspectGroup.contains(recaptureBtn)),
+        ordered,
+        sameSize,
+        heights: [btnH(openBtn), btnH(saveBtn), btnH(recaptureBtn)]
       };
     })()`);
     const outputLayoutOk = !outputLayoutProbe.mainHasPickFolder && !outputLayoutProbe.mainHasOutputDir
-      && outputLayoutProbe.openInAspect && outputLayoutProbe.openIsSelectNextSibling;
+      && outputLayoutProbe.openInAspect && outputLayoutProbe.openIsSelectNextSibling
+      && outputLayoutProbe.saveRecaptureInAspect && outputLayoutProbe.ordered && outputLayoutProbe.sameSize;
     console.log('[smoke] 输出目录布局结果:', JSON.stringify(outputLayoutProbe));
 
     // 回归探针：无边框窗口的三个自定义控制按钮存在，最大化/还原可往返

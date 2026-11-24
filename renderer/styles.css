@@ -113,7 +113,6 @@ body:not(.settings-body) .topbar .status-chip { -webkit-app-region: no-drag; }
 .btn.ghost { background: transparent; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn.primary:hover { background: #3d7df0; }
-.btn.big { padding: 9px 22px; font-size: 15px; }
 .btn.active { background: var(--accent-soft); border-color: var(--accent); color: #cfe0ff; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; }
 
@@ -369,8 +368,6 @@ body.selecting .crop-stage .cropper-container { cursor: crosshair !important; }
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px 16px;
 }
-
-.save-bar { display: flex; align-items: center; gap: 10px; padding-top: 12px; }
 
 /* ---------------- 状态栏 / Toast ---------------- */
 
