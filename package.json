@@ -18,11 +18,11 @@
     "dist:nsis": "node scripts/dist-nsis.mjs",
     "verify": "node scripts/verify-installer.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
     "cropperjs": "1.6.2",
     "electron": "^38.3.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "png-to-ico": "^3.0.2"
   },
   "build": {
     "appId": "com.local.verticalcamstudio",
@@ -41,8 +41,7 @@
       "target": [
         "nsis",
         "portable"
-      ],
-      "signAndEditExecutable": false
+      ]
     },
     "nsis": {
       "oneClick": false,

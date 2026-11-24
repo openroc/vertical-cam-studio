@@ -74,10 +74,11 @@ if (!existsSync(outDir)) {
       continue;
     }
 
-    // NSIS 产物前 64KB 必然含 Nullsoft stub 标识
+    // NSIS 产物头部含 Nullsoft stub 标识；启用图标后 rcedit 会重排 PE，
+    // 标识可能后移出前 64KB，因此把检测窗口放宽到前 1MB
     let isNsis = false;
     try {
-      const head = readFileSync(exe).subarray(0, 64 * 1024);
+      const head = readFileSync(exe).subarray(0, 1024 * 1024);
       isNsis = head.includes(Buffer.from('Nullsoft'));
     } catch {
       /* 读取失败在下面统一报错 */

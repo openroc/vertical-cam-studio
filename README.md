@@ -144,6 +144,8 @@ npm run dist:nsis   # 受限环境后备：两遍构建（卸载器步骤被沙�
 
 每次构建结束自动运行 `scripts/verify-installer.mjs`：检查 `build/installer-manual.nsi` 源脚本大小（1KB~200KB）、exe ≥1MB 且含 Nullsoft 标识、体积不小于 `win-unpacked` 的 15%、主程序存在；任一不满足即失败。也可单独 `npm run verify`。
 
+**应用图标**：`build/icon.ico`（exe / 安装器）与 `renderer/icon.png`（窗口）由 `scripts/make-icon.mjs` 从 `build/icon-source.png` 生成——脚本会清除 AI 源图右下角水印、箱型采样缩放 256/128/64/48/32/16 并经 `png-to-ico` 拼装。换图标时替换 `icon-source.png` 后执行 `node scripts/make-icon.mjs build/icon-source.png` 即可。
+
 本机 Electron 二进制下载受限时，构建命令与离线打包方式见排障文档 1.9；构建环境要求、asar 与 rcedit 的坑见第 1 节。
 
 ---
@@ -172,6 +174,9 @@ vertical-cam-studio/
 │   ├── profile-row.mjs       # 灰阶剖面
 │   └── vlm-ocr.mjs           # 本地 VLM 批量 OCR 对照
 ├── build/
+│   ├── icon.ico              # exe / NSIS 安装器图标（make-icon.mjs 生成）
+│   ├── icon.png              # 窗口图标（256px）
+│   ├── icon-source.png       # AI 生成的 1024px 图标源图
 │   └── installer-manual.nsi  # 手写 NSIS 备用脚本（勿命名为 installer.nsi）
 ├── docs/
 │   ├── TROUBLESHOOTING.md    # 排障与踩坑记录

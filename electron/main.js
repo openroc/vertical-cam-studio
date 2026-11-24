@@ -188,6 +188,7 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 640,
     show: false,
+    icon: path.join(__dirname, '..', 'renderer', 'icon.png'),
     // 去掉系统标题栏（含原生最小化/最大化/关闭），改用顶栏自定义按钮
     frame: false,
     backgroundColor: '#12141a',
@@ -289,6 +290,7 @@ function openSettingsWindow() {
     height: 720,
     minWidth: 480,
     minHeight: 520,
+    icon: path.join(__dirname, '..', 'renderer', 'icon.png'),
     parent: mainWindow || undefined,
     backgroundColor: '#12141a',
     title: '设置 · 垂直摄像头工作室',
