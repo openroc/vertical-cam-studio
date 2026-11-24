@@ -12,8 +12,8 @@
 
 | 项 | 主题 | 状态 | 说明 |
 |---|---|---|---|
-| R4-7 | 兜底对话框无 `mainWindow` 空值防护 | ❌ 仍未修 | `main.js` L397 `dialog:selectFolder`、L432 `image:save` 仍直接把 `mainWindow` 作为父窗口参数传入；R4「建议顺序」漏列导致第 3 批未覆盖 |
-| R3-3 | main.js 探针模块化 | ❌ 未做且持续恶化 | 由 R4 时 1613 行增至 **1777 行**（+164，主要来自 UI 统计落盘 + smoke 统计探针 + 菜单/DevTools 配置）；`--abtest/--shapes/--audit/--smoke` 四类探针模板仍与运行时代码混排（约 L522–1157、L1163–1777） |
+| R4-7 | 兜底对话框无 `mainWindow` 空值防护 | ✅ 已修 2026-11-24 | 第 3 批：`dialog:selectFolder` / `image:save` 父窗口参数改为 `mainWindow ?? undefined` |
+| R3-3 | main.js 探针模块化 | ✅ 已修 2026-11-24 | 第 5 批：四类探针搬到 `electron/dev/probes.js`，main.js **1788 → 545 行**；四类探针均实跑通过 |
 
 R4 其余 13 项（R4-1~6、R4-8~14）经重读确认均已落地，无回退。
 
@@ -21,7 +21,7 @@ R4 其余 13 项（R4-1~6、R4-8~14）经重读确认均已落地，无回退。
 
 ## 二、本轮新发现
 
-### R5-1 [P2] UI 统计标识白名单未排除 JS 原型键 → 原型污染 + handler 抛错 🆕
+### R5-1 [P2] UI 统计标识白名单未排除 JS 原型键 → 原型污染 + handler 抛错 🆕 ✅ 已修 2026-11-24
 
 **位置**：`renderer/core.js` L115-121（`normalizeStatId`）、`electron/main.js` L319-340（`stats:button`）
 
@@ -61,7 +61,7 @@ item.days = pruneDays(... item.days[day] ...);  // undefined → TypeError
 
 ---
 
-### R5-2 [P3] 统计文件单个 item 结构损坏时 handler 抛 TypeError 🆕（已确认）
+### R5-2 [P3] 统计文件单个 item 结构损坏时 handler 抛 TypeError 🆕（已确认） ✅ 已修 2026-11-24
 
 **位置**：`main.js` L103-111 `loadUsage` + L331-334 `stats:button`
 
@@ -86,7 +86,7 @@ item.days = pruneDays(..., { [day]: (item.days[day] || 0) + 1 });
 
 ---
 
-### R5-3 [P3] `sanitizeName` 截断后可能重新产生尾点/尾空格 🆕（已确认）
+### R5-3 [P3] `sanitizeName` 截断后可能重新产生尾点/尾空格 🆕（已确认） ✅ 已修 2026-11-24
 
 **位置**：`renderer/core.js` L35-46
 
@@ -107,7 +107,7 @@ core.sanitizeName('a' + 'x'.repeat(117) + ' .' + 'b')
 
 ---
 
-### R5-4 [P3] `saveCurrent` 无并发保护，快速连按会让 `{n}` 重复 🆕
+### R5-4 [P3] `saveCurrent` 无并发保护，快速连按会让 `{n}` 重复 🆕 ✅ 已修 2026-11-24
 
 **位置**：`renderer/app.js` L1001-1038
 
@@ -119,7 +119,7 @@ R4-5 把计数器改成「成功后再递增」（正确修复了取消跳号）
 
 ---
 
-### R5-5 [P3] `dialog:selectFolder` 绕过设置校验白名单 🆕
+### R5-5 [P3] `dialog:selectFolder` 绕过设置校验白名单 🆕 ✅ 已修 2026-11-24
 
 **位置**：`main.js` L396-406
 
@@ -134,7 +134,7 @@ persistSettings();
 
 ---
 
-### R5-6 [P3] 明细日志同步写盘未防抖，与聚合文件策略不对称 🆕
+### R5-6 [P3] 明细日志同步写盘未防抖，与聚合文件策略不对称 🆕 ✅ 已修 2026-11-24
 
 **位置**：`main.js` L133-146、L319-340
 
@@ -144,7 +144,7 @@ persistSettings();
 
 ---
 
-### R5-7 [P3] 兜底对话框仍无 `mainWindow` 空值防护（R4-7 延续）
+### R5-7 [P3] 兜底对话框仍无 `mainWindow` 空值防护（R4-7 延续） ✅ 已修 2026-11-24
 
 **位置**：`main.js` L397、L432
 
@@ -152,7 +152,7 @@ persistSettings();
 
 ---
 
-### R5-8 [P3] 屏幕截图 fallback 可能截错屏（R4-6 延续，硬件未验证）
+### R5-8 [P3] 屏幕截图 fallback 可能截错屏（R4-6 延续，硬件未验证） ✅ 已修 2026-11-24
 
 **位置**：`main.js` L463
 
@@ -164,7 +164,7 @@ const source = sources.find((s) => String(s.display_id) === String(display.id)) 
 
 ---
 
-### R5-9 [P3] UI 统计缺少 handler 级单测，smoke 只覆盖 happy path 🆕
+### R5-9 [P3] UI 统计缺少 handler 级单测，smoke 只覆盖 happy path 🆕 ✅ 已修 2026-11-24
 
 **位置**：`test/core.test.js`（4 个新单测）、`main.js` L1710-1728（usageProbe）
 
@@ -174,17 +174,17 @@ const source = sources.find((s) => String(s.display_id) === String(display.id)) 
 
 ---
 
-### R5-10 [nit] `close` / `closed` 处理器整体未缩进 🆕
+### R5-10 [nit] `close` / `closed` 处理器整体未缩进 🆕 ✅ 已修 2026-11-24
 
 **位置**：`main.js` L209-221
 
 两个处理器从行首开始（`:1` 缩进），与全文件其余代码的 2 格风格不一致，是 R4-1 修复时只处理了重复 handler、未统一缩进的残留。纯样式。
 
-### R5-11 [nit] README 目录结构与安全表已漂移 🆕
+### R5-11 [nit] README 目录结构与安全表已漂移 🆕 ✅ 已修 2026-11-24
 
 `README.md` L92-109 只列了 `scripts/copy-vendor.mjs` 一个脚本（实际有 5 个），未列 `renderer/core.js`、`test/`、`CODE_REVIEW*.md`、`start.ps1` 等；L116 的 CSP 表仍写 `default-src 'self'; style-src 'self'; script-src 'self'`，未反映 R4-13 新增的 `base-uri 'self'; object-src 'none'` 及 img/media 白名单。
 
-### R5-12 [nit] 统计文档「只留 90 天」表述易误解 🆕
+### R5-12 [nit] 统计文档「只留 90 天」表述易误解 🆕 ✅ 已修 2026-11-24
 
 `README.md` L134 写「每个按钮的 count / first / last / days（只留最近 90 天）」。实际只有 `days` 映射做 `pruneDays(90)`，`total` 与 `items[id].count` 是永久累计。建议改成「`days` 只留最近 90 天，count/total 为累计值」。
 
@@ -218,3 +218,37 @@ const source = sources.find((s) => String(s.display_id) === String(display.id)) 
 3. **R5-7 + R5-5 + R5-4**：dialog 空值防护、outputDir 复用 validator、保存并发锁。
 4. **R5-6 + R5-8 + R5-10~12**：明细日志防抖、截图 fallback 提示、缩进/文档清理。
 5. **R3-3**：main.js 探针模块化（择期重构，唯一持续恶化项）。
+
+---
+
+## 六、修复记录（2026-11-24，五批全部完成）
+
+先在非 Git 目录初始化仓库并提交基线 `ef6a3c2`，随后按建议顺序分五个提交逐批修复。
+
+| 提交 | 批次 | 内容 |
+|---|---|---|
+| `e91089c` | 第 1 批 | R5-1/2/9：`normalizeStatId` 加原型键黑名单；`items/days` 改 `Object.create(null)` + `hasOwnProperty`；新增 `createUsageData` / `normalizeUsageData` / `applyButtonStat` 三个纯函数，主进程 handler 只做 IO；补 6 条单测 |
+| `c13fa47` | 第 2 批 | R5-3：`sanitizeName` 改为先截断到 120 再去尾部点/空格；补 120 字符边界单测 |
+| `9e8af12` | 第 3 批 | R5-7/5/4：dialog 父窗口 `mainWindow ?? undefined`；`dialog:selectFolder` 复用 `SETTINGS_VALIDATORS.outputDir`；`saveCurrent` 加 `saveInFlight` 并发锁（`finally` 释放） |
+| `740393e` | 第 4 批 | R5-6/8/10~12：明细日志与聚合共用 800ms 防抖、批量写入 + 写失败重试；`screen:capture` 返回 `matched` 标志，渲染层对不上时 toast 提示；close/closed 缩进；README 目录结构、CSP 表、统计说明同步 |
+| `c66517f` | 第 5 批 | R3-3：四类探针搬到 `electron/dev/probes.js`（1271 行），通过 `createProbes({app, fs, path, getMainWindow, flushUsage, usageFile, usageLogFile})` 注入依赖；main.js **1788 → 545 行** |
+
+**验证（均为真实执行）：**
+
+- `node --check` 覆盖 `electron/main.js`、`electron/dev/probes.js`、`renderer/app.js`、`renderer/core.js` 通过；
+- `node --test` 从 23 → **30/30 全绿**；
+- 完整 Electron `--smoke` 每批后复跑，`allOk: true`（最后一批 `usageProbe` 为 `{"before":4,"after":5,"bumped":true,"usageFilesOk":true}`）；
+- 源码抽取 + mock 专项：
+  - 原型键：`applyButtonStat(usage, '__proto__')` 返回 `null`，`Object.prototype` 三个属性均未被污染；
+  - 损坏 item：缺 `days` / `days:null` 两种形态不再抛错，自动重建；
+  - 文件名：120 字符边界不再以空格或点结尾；
+  - 保存并发：并发第二次调用被挡（`calls=1`、`footer` 含「稍候」），首次完成后锁释放，两次成功 counter=2；取消仍不消耗 `{n}`（取消后下一次仍提交 counter=1）；
+  - 明细日志：5 次点击在 `flushUsage()` 时一次写入 5 行，写入前文件不存在；
+  - 截图匹配：命中 display 2 → `matched:true` + `Secondary`；对不上 → 回落 `Primary` 且 `matched:false`；
+- 第 5 批探针模块化后四类探针全部实跑：
+  - `--smoke`：`allOk: true`；
+  - `--abtest`：生成图像与 profiles，四档线宽 `solid/broken` 输出正常，`exit=0`；
+  - `--shapes`：ASCII 竖线剖面与 `gapInk/capInk/haloInk` 输出正常，`exit=0`；
+  - `--audit abtest/audit_raw.png`：读到 427×571 原图、变体图写入完成，`exit=0`（本机无 VLM 服务，用 `VLM_ENDPOINT=http://127.0.0.1:1` 让请求快速失败，仅验证入口与落盘链路）。
+
+**未覆盖**：真实多显示器/失效摄像头硬件本机不可用，R5-8 的 `matched:false` 提示以 mock 验证逻辑分支；`--audit` 的 VLM 识别结果需在有本地推理服务的机器上确认。
