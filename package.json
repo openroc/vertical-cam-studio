@@ -25,6 +25,8 @@
   "build": {
     "appId": "com.local.verticalcamstudio",
     "productName": "垂直摄像头工作室",
+    "asar": false,
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },
@@ -41,6 +43,7 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     }

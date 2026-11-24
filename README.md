@@ -92,7 +92,11 @@ npm run dist       # 输出到 release/，含 NSIS 安装包与便携版
 - `垂直摄像头工作室 0.1.0.exe`：**portable 便携版**，双击即运行、免安装，适合临时使用或没有管理员权限的场景。
 - `win-unpacked/`：免安装程序目录，主 exe 可直接运行。
 
-> **首次运行弹出蓝色「Windows 已保护你的电脑」(SmartScreen) 提示**：这是 Windows 对**未签名新程序**的正常防护，不是程序损坏。本项目构建时没有代码签名证书（`no signing info identified, signing is skipped`），exe 的 `Signature` 为 `NotSigned`。处理方式：在警告窗口点「更多信息」→「仍要运行」即可正常启动；首次放行后 Windows 会记住该文件，一般不再提示。彻底消除提示需购买 OV/EV 代码签名证书并在打包时配置签名（EV 证书可立即建立 SmartScreen 声誉）。注意：SmartScreen 拦截发生在exe 启动时；若把文件放在受限磁盘（如某些映射盘）导致连警告都不弹、直接无反应，请先把 `release/` 整个目录复制到本机 C 盘再运行。
+> **关键构建配置：`asar: false`**：Electron 38 默认对 `app.asar` 做完整性校验（integrity hash），exe 里写死了 asar 的 SHA256。一旦 exe 与 asar 不是同一次构建产出（例如中途用 rcedit 改过 exe、或先 `--dir` 再手动 makensis 时混用了新旧 asar），hash 失配会导致程序**静默退出、点击无任何反应**。本项目在 `package.json` 的 `build` 中设 `asar: false`（代码以明文 `resources/app/` 目录发布，无 asar 校验环节），参考同类可正常运行的 Electron 项目配置。**重建务必保证 exe 与 app 内容来自同一次构建**：`--dir` 生成 `win-unpacked` 后，portalbe 构建会重打包 win-unpacked，因此 NSIS 安装包要在**最后一次** `--dir`/portable 之后再 makensis，避免混入旧文件。
+
+> **首次运行弹出蓝色「Windows 已保护你的电脑」(SmartScreen) 提示**：这是 Windows 对**未签名新程序**的正常防护，不是程序损坏。本项目构建时没有代码签名证书（`no signing info identified, signing is skipped`），exe 的 `Signature` 为 `NotSigned`。处理方式：在警告窗口点「更多信息」→「仍要运行」即可正常启动；首次放行后 Windows 会记住该文件，一般不再提示。彻底消除提示需购买 OV/EV 代码签名证书并在打包时配置签名（EV 证书可立即建立 SmartScreen 声誉）。
+>
+> **若点「仍要运行」后无任何反应**：优先怀疑上面的 asar integrity 失配 —— 确认 `release/win-unpacked/resources/` 下是 `app/` 目录而不是 `app.asar` 文件；若是 `app.asar`，说明构建未生效 `asar:false`，需按上文重建。其次才是把整个 `release/` 复制到本机 C 盘再试（某些映射盘会拦截 exe 执行）。
 
 > 首次运行会请求摄像头权限，请点「允许」。若设备列表为空，先插好摄像头再点「刷新」。
 
