@@ -113,11 +113,17 @@
   /* ---------------- UI 使用统计（主进程） ---------------- */
 
   const STAT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+  // 这些标识虽然匹配 STAT_ID，但都是 Object.prototype 上的键：
+  // 直接拿 usage.items[id] 做 truthy 判断会命中原型链，导致原型污染 + handler 抛错。
+  const BLOCKED_STAT_IDS = new Set([
+    '__proto__', 'constructor', 'prototype', 'toString', 'valueOf',
+    'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable', 'toLocaleString'
+  ]);
 
-  /** 只接受稳定的 ASCII 标识符，避免把任意文本/超长内容写进统计文件 */
+  /** 只接受稳定的 ASCII 标识符，并排除会命中原型链的保留键 */
   function normalizeStatId(id) {
     const s = String(id === undefined || id === null ? '' : id).trim();
-    return STAT_ID.test(s) ? s : null;
+    return STAT_ID.test(s) && !BLOCKED_STAT_IDS.has(s) ? s : null;
   }
 
   /** 统计按自然日聚合，格式 YYYYMMDD（与 stamp().date 一致） */
@@ -134,6 +140,90 @@
     return out;
   }
 
+  /** 空统计结构：days/items 用无原型对象，杜绝原型键命中 */
+  function createUsageData() {
+    return { version: 1, total: 0, days: Object.create(null), items: Object.create(null) };
+  }
+
+  /** 把天数映射规范化：只保留 YYYYMMDD 键与非负整数值 */
+  function normalizeDayCounts(days) {
+    const out = Object.create(null);
+    if (!days || typeof days !== 'object') return out;
+    for (const key of Object.keys(days)) {
+      if (!/^\d{8}$/.test(key)) continue;
+      const n = Number(days[key]);
+      if (Number.isFinite(n) && n > 0) out[key] = Math.floor(n);
+    }
+    return out;
+  }
+
+  /**
+   * 读取磁盘上的统计文件时逐项规范化：
+   * 手工编辑、旧版本残留或半截写入造成的坏字段不能带病运行，
+   * 否则 stats:button 里 item.days[day] 会抛 TypeError。
+   */
+  function normalizeUsageData(raw) {
+    const out = createUsageData();
+    if (!raw || raw.version !== 1 || !raw.items || typeof raw.items !== 'object') return out;
+
+    if (Number.isFinite(raw.total) && raw.total >= 0) out.total = Math.floor(raw.total);
+    out.days = pruneDays(normalizeDayCounts(raw.days), 90);
+
+    for (const key of Object.keys(raw.items)) {
+      const id = normalizeStatId(key);
+      if (!id) continue;
+      const item = raw.items[key];
+      if (!item || typeof item !== 'object') continue;
+      const days = normalizeDayCounts(item.days);
+      const count = Number.isFinite(item.count) && item.count > 0
+        ? Math.floor(item.count)
+        : Object.keys(days).reduce((sum, d) => sum + days[d], 0);
+      if (!count) continue;
+      out.items[id] = {
+        count,
+        first: typeof item.first === 'string' ? item.first : null,
+        last: typeof item.last === 'string' ? item.last : null,
+        days
+      };
+    }
+    return out;
+  }
+
+  /**
+   * 纯函数：把一次按钮点击计入统计（就地修改 usage，返回本次结果）。
+   * 所有校验/重建都在这里完成，主进程 handler 只负责 IO。
+   */
+  function applyButtonStat(usage, id, date = new Date()) {
+    if (!usage || typeof usage !== 'object') return null;
+    const safeId = normalizeStatId(id);
+    if (!safeId) return null;
+
+    const iso = date.toISOString();
+    const day = dayKey(date);
+
+    usage.total = (Number.isFinite(usage.total) ? usage.total : 0) + 1;
+    usage.days = pruneDays(
+      Object.assign(Object.create(null), usage.days, { [day]: (usage.days && usage.days[day] || 0) + 1 }),
+      90
+    );
+
+    // hasOwnProperty 而非 truthy 判断：即使调用方传入普通对象也不会命中原型链
+    const existing = Object.prototype.hasOwnProperty.call(usage.items, safeId) ? usage.items[safeId] : null;
+    const item = (existing && typeof existing === 'object') ? existing
+      : { count: 0, first: iso, last: iso, days: Object.create(null) };
+    item.count = (Number.isFinite(item.count) ? item.count : 0) + 1;
+    item.last = iso;
+    if (!item.first) item.first = iso;
+    item.days = pruneDays(
+      Object.assign(Object.create(null), item.days, {
+        [day]: (item.days && item.days[day] || 0) + 1
+      }),
+      90
+    );
+    usage.items[safeId] = item;
+    return { id: safeId, iso, day, item };
+  }
+
   return {
     pad,
     stamp,
@@ -143,6 +233,9 @@
     resolveExportScale,
     normalizeStatId,
     dayKey,
-    pruneDays
+    pruneDays,
+    createUsageData,
+    normalizeUsageData,
+    applyButtonStat
   };
 }));

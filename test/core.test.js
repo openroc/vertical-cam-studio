@@ -160,3 +160,85 @@ test('pruneDays: 未超限原样返回，超限只留最近 90 天', () => {
   const small = { 20260101: 1 };
   assert.strictEqual(core.pruneDays(small), small);
 });
+
+test('normalizeStatId: 排除会命中原型链的保留键', () => {
+  for (const key of ['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty']) {
+    assert.strictEqual(core.normalizeStatId(key), null, `${key} 必须被拒绝`);
+  }
+  assert.strictEqual(core.normalizeStatId('btnShot'), 'btnShot');
+});
+
+test('applyButtonStat: 正常计数且返回本次命中信息', () => {
+  const usage = core.createUsageData();
+  const d = new Date(2026, 10, 24, 8, 0, 0);
+  const r1 = core.applyButtonStat(usage, 'btnShot', d);
+  const r2 = core.applyButtonStat(usage, 'btnShot', d);
+  assert.strictEqual(r2.id, 'btnShot');
+  assert.strictEqual(r2.day, '20261124');
+  assert.strictEqual(usage.total, 2);
+  assert.strictEqual(usage.items.btnShot.count, 2);
+  assert.strictEqual(usage.days['20261124'], 2);
+  assert.strictEqual(usage.items.btnShot.days['20261124'], 2);
+  assert.ok(usage.items.btnShot.first);
+  assert.ok(usage.items.btnShot.last >= usage.items.btnShot.first);
+});
+
+test('applyButtonStat: 原型键不污染 Object.prototype、不计数', () => {
+  const usage = core.createUsageData();
+  assert.strictEqual(core.applyButtonStat(usage, '__proto__'), null);
+  assert.strictEqual(core.applyButtonStat(usage, 'constructor'), null);
+  assert.strictEqual(usage.total, 0);
+  assert.strictEqual(Object.prototype.count, undefined);
+  assert.strictEqual(Object.prototype.last, undefined);
+  assert.strictEqual(Object.prototype.days, undefined);
+});
+
+test('applyButtonStat: item 缺 days / days 为 null 时不抛错', () => {
+  const usage = { version: 1, total: 3, days: {}, items: { btnShot: { count: 2, first: 'old' } } };
+  assert.doesNotThrow(() => core.applyButtonStat(usage, 'btnShot'));
+  assert.strictEqual(usage.items.btnShot.count, 3);
+  assert.strictEqual(usage.items.btnShot.first, 'old');
+  assert.ok(usage.items.btnShot.days && typeof usage.items.btnShot.days === 'object');
+
+  usage.items.btnSave = { count: 5, days: null };
+  assert.doesNotThrow(() => core.applyButtonStat(usage, 'btnSave'));
+  assert.strictEqual(usage.items.btnSave.count, 6);
+});
+
+test('normalizeUsageData: 过滤坏键与坏字段，保留合法统计', () => {
+  const raw = {
+    version: 1,
+    total: 9,
+    days: { 20261124: 3, bad: 5, 20261123: -1 },
+    items: {
+      btnShot: { count: 3, first: 'a', last: 'b', days: { 20261124: 2, bad: 7 } },
+      btnSave: { count: 2, days: null },
+      __proto__: { count: 100 },
+      constructor: { count: 100 },
+      broken: null
+    }
+  };
+  const u = core.normalizeUsageData(raw);
+  assert.strictEqual(u.total, 9);
+  assert.strictEqual(u.days['20261124'], 3);
+  assert.strictEqual(u.days.bad, undefined);
+  assert.strictEqual(u.days['20261123'], undefined);
+  assert.strictEqual(u.items.btnShot.count, 3);
+  assert.strictEqual(u.items.btnShot.days['20261124'], 2);
+  assert.strictEqual(u.items.btnShot.days.bad, undefined);
+  // days 为 null → 由 count 兜底，仍保留该项
+  assert.strictEqual(u.items.btnSave.count, 2);
+  assert.deepStrictEqual(Object.keys(u.items.btnSave.days), []);
+  assert.strictEqual(Object.keys(u.items).length, 2);
+  assert.strictEqual(Object.getPrototypeOf(u.items), null);
+  assert.strictEqual(Object.getPrototypeOf(u.days), null);
+});
+
+test('normalizeUsageData: 文件损坏或非 v1 时返回空结构', () => {
+  for (const raw of [null, {}, { version: 2, items: {} }, { version: 1, items: null }]) {
+    const u = core.normalizeUsageData(raw);
+    assert.strictEqual(u.version, 1);
+    assert.strictEqual(u.total, 0);
+    assert.deepStrictEqual(Object.keys(u.items), []);
+  }
+});

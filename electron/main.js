@@ -103,10 +103,9 @@ function usageLogFile() {
 function loadUsage() {
   try {
     const raw = JSON.parse(fs.readFileSync(usageFile(), 'utf8'));
-    if (!raw || raw.version !== 1 || !raw.items || typeof raw.items !== 'object') throw new Error('格式不符');
-    return raw;
+    return normalizeUsageData(raw);
   } catch {
-    return { version: 1, total: 0, days: {}, items: {} };
+    return createUsageData();
   }
 }
 
@@ -278,8 +277,9 @@ const {
   sanitizeName,
   renderTemplate,
   normalizeStatId,
-  dayKey,
-  pruneDays
+  createUsageData,
+  normalizeUsageData,
+  applyButtonStat
 } = require('../renderer/core.js');
 
 function dataUrlToBuffer(dataUrl) {
@@ -318,29 +318,19 @@ ipcMain.handle('settings:get', () => settings);
 
 /** UI 按钮埋点：渲染层 fire-and-forget，主进程校验 identifier 后本地落盘 */
 ipcMain.on('stats:button', (_e, rawId) => {
-  const id = normalizeStatId(rawId);
-  if (!id || !usage) return;
+  // 计数逻辑全部在 core.js 的纯函数里完成（含原型键排除与坏字段重建），
+  // handler 只负责把结果落盘；这样同一套规则可被单测直接覆盖。
+  const hit = applyButtonStat(usage, rawId);
+  if (!hit) return;
 
-  const now = new Date();
-  const iso = now.toISOString();
-  const day = dayKey(now);
-
-  usage.total = (usage.total || 0) + 1;
-  usage.days = pruneDays(Object.assign({}, usage.days, { [day]: (usage.days && usage.days[day] || 0) + 1 }));
-
-  const item = usage.items[id] || (usage.items[id] = { count: 0, first: iso, last: iso, days: {} });
-  item.count += 1;
-  item.last = iso;
-  item.days = pruneDays(Object.assign({}, item.days, { [day]: (item.days[day] || 0) + 1 }));
-
-  appendUsageLog(iso, id);
+  appendUsageLog(hit.iso, hit.id);
 
   // 聚合文件 800ms 防抖落盘；退出时 flushUsage() 保证不丢尾部数据
   if (!usageTimer) usageTimer = setTimeout(flushUsage, 800);
 });
 
 /** 读取统计快照（供后续做可视化/自检；仅本地 IPC） */
-ipcMain.handle('stats:usage', () => JSON.parse(JSON.stringify(usage || { version: 1, total: 0, days: {}, items: {} })));
+ipcMain.handle('stats:usage', () => JSON.parse(JSON.stringify(usage || createUsageData())));
 
 /**
  * 逐键校验设置值。
