@@ -34,10 +34,18 @@ NSIS 安装器解压、清理解压临时文件时以普通 Medium 权限访问�
 
 **处理**：
 
-- 临时：把安装包复制到普通完整性目录再运行（当前交付位置 `H:\vc-dist\`）；
-- 永久：管理员权限执行 `icacls H:\tmp /setintegritylevel M`（本机无管理员权限，未执行）。
+- 永久修复（**2026-11-24 已执行成功**）：管理员 PowerShell 执行 `icacls H:\tmp /setintegritylevel M`，输出 `processed 1 file; Failed processing 0 files`。修复后：
+  - `H:\tmp` 的完整性标签变为 `Medium Mandatory Level`；
+  - 子目录继承的 `Everyone:(CI)(DENY)(S,DC)` 不再出现，release 等子目录 ACL 干净；
+  - 安装包直接放在 `H:\tmp\vert-cam-studio\release` 静默安装 exit=0，装出的应用正常启动；
+  - electron-builder 单遍 `npm run dist` 也能直接通过卸载器步骤（见 1.3）。
+- 临时方案（修复前的绕过方式）：把安装包复制到普通完整性目录再运行。
 
-**ACL 修复笔记**：`icacls H:\tmp /remove:d Everyone` 只能去掉 DENY ACE，**改不动完整性标签**（需要管理员令牌 / SeRelabelPrivilege），单独执行它并不能恢复 NSIS 运行。
+**ACL 修复笔记**：
+
+- `icacls H:\tmp /remove:d Everyone` 只能去掉 DENY ACE，**改不动完整性标签**（需要管理员令牌）；
+- `icacls H:\tmp /setintegritylevel M` 需要**提升权限的管理员终端**执行，普通终端报"拒绝访问"；
+- `/setintegritylevel` 不带 `(OI)(CI)` 时只作用于该文件夹自身，子目录靠继承获得干净的 ACL —— 实测子目录修复后不再带任何 Mandatory Label 与 DENY 项。
 
 ---
 
@@ -58,6 +66,8 @@ NSIS 安装器解压、清理解压临时文件时以普通 Medium 权限访问�
 **根因**：electron-builder 生成卸载器的做法是「先产出一个临时安装器，再运行它、取出它释放的 `__uninstaller-*.exe`」。这一步要在输出目录（本机 `release/`，位于 `H:\tmp` 下）执行安装器——正是 1.1 的 Low 完整性问题，必然失败。
 
 **处理**（`scripts/dist-nsis.mjs`，即 `npm run dist:nsis`）：
+
+> **2026-11-24 更新**：`H:\tmp` 完整性修复后，单遍 `npx electron-builder --win nsis` 已实测可直接通过卸载器步骤（日志出现 `signing ... path=release\__uninstaller-*.exe`），本 workaround **不再是必需**，保留作为其他受限环境的后备方案。
 
 1. 第一遍构建，产出携带卸载器的中间安装器（失败可忽略）；
 2. 把中间安装器复制到系统 TEMP（C 盘，普通完整性），以 `/S` 静默执行，在 `release/` 下生成 `__uninstaller-*.exe`；

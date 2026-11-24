@@ -16,7 +16,7 @@
 
 - 首次运行 Windows 可能弹「Windows 已保护你的电脑」：点「更多信息」→「仍要运行」（程序未做代码签名，并非损坏，详见排障文档 1.7）。
 - 首次启动会请求摄像头权限，点「允许」。设备列表为空时插好摄像头再点「刷新」。
-- 安装包**不要放在** `H:\tmp` 这类被安全策略标记为低完整性的目录里运行，否则 NSIS 会报临时文件错误（详见排障文档 1.1）。
+- 若安装包所在目录被安全策略标记为**低完整性**（如被沙箱接管的工作区目录），NSIS 会报临时文件错误；把安装包移到普通目录或用管理员 `icacls <目录> /setintegritylevel M` 修复（详见排障文档 1.1）。
 
 ### 免安装版
 
@@ -130,7 +130,8 @@ npm run vendor     # 手动重新复制 cropperjs dist
 ## 打包
 
 ```bash
-npm run dist:nsis   # 推荐：两遍构建产出 NSIS 安装包，结束后自动校验
+npm run dist        # 推荐：electron-builder 单遍构建 + 自动校验，输出到 release/
+npm run dist:nsis   # 受限环境后备：两遍构建（卸载器步骤被沙箱阻断时使用）
 ```
 
 产物输出到 `release/`：
@@ -143,7 +144,7 @@ npm run dist:nsis   # 推荐：两遍构建产出 NSIS 安装包，结束后自�
 
 每次构建结束自动运行 `scripts/verify-installer.mjs`：检查 `build/installer-manual.nsi` 源脚本大小（1KB~200KB）、exe ≥1MB 且含 Nullsoft 标识、体积不小于 `win-unpacked` 的 15%、主程序存在；任一不满足即失败。也可单独 `npm run verify`。
 
-构建环境要求、两遍构建的原因、离线打包方式、asar 与 rcedit 的坑，全部记录在 **[docs/TROUBLESHOOTING.md 第 1 节](docs/TROUBLESHOOTING.md)**。
+本机 Electron 二进制下载受限时，构建命令与离线打包方式见排障文档 1.9；构建环境要求、asar 与 rcedit 的坑见第 1 节。
 
 ---
 
