@@ -70,27 +70,47 @@ Copy-Item .\node_modules\electron\dist\* "$env:TEMP\elec-run\" -Recurse -Force
 打包（Windows exe）：
 
 ```bash
-npm run dist       # 输出到 release/，含 NSIS 安装包与便携版
+npm run dist:nsis   # 推荐：两遍构建产出 NSIS 安装包 + 自动校验，输出到 release/
+npm run dist        # 直调 electron-builder（在本机 H:\tmp 低完整性目录下会在卸载器步骤失败）
 ```
 
-> **离线 / 受限环境备用打包**：若 `npm run dist` 在下载 Electron 或末尾“执行安装包生成卸载器”步骤卡住（无头/沙箱环境常见），可复用本地已解压的 Electron 运行时与 NSIS 工具，分两步生成安装包：
+> **构建产物校验（每次构建自动执行）**：`npm run dist:nsis` 结束时会运行 `scripts/verify-installer.mjs`，检查
+> ① `build/installer-manual.nsi` 源脚本大小是否正常（1KB~200KB，防截断/防误写入二进制）；
+> ② 每个 exe 产物 ≥1MB、前 64KB 含 Nullsoft 标识、体积不小于 win-unpacked 的 15%（防"51KB 截断包"）；
+> ③ win-unpacked 主程序存在。任一不满足即退出码非 0。也可单独执行 `npm run verify`。
+> 注意：手写 NSIS 备用脚本已从 `build/installer.nsi` 改名为 `build/installer-manual.nsi`——
+> electron-builder 会自动把 `build/installer.nsi` 当作自定义安装脚本，导致标准模板被替换、中文注释引发 `Invalid command: "?;"`。
+
+> **本机沙箱环境两遍构建说明（`scripts/dist-nsis.mjs`）**：本项目位于 `H:\tmp`，该目录被本地安全沙箱标记为
+> Low 完整性（`Mandatory Label\Low Mandatory Level` + Everyone 拒绝 ACE），NSIS 安装器在 Low 完整性目录中
+> 无法创建临时文件，直接表现为 `NSIS Error: Error writing temporary file. Make sure your temp folder is valid.`，
+> 同时 electron-builder 生成卸载器时需要运行一次中间安装器，也会在 release/ 下失败。
+> `dist-nsis.mjs` 的处理：第一遍构建产出卸载器安装器 → 复制到系统 TEMP（C 盘，普通完整性）以 `/S` 执行、
+> 在 release 下生成 `__uninstaller-*.exe` → 第二遍构建跳过执行、产出带卸载器的最终安装包 → 自动校验。
+> 期间对 `node_modules/app-builder-lib` 的临时补丁会自动打上并还原。
+>
+> **运行位置要求**：安装包本身也是 NSIS 程序，同样不能从 Low 完整性目录启动。把 `release/VerticalCamStudio-Setup-0.1.0.exe`
+> 复制到普通完整性目录（如 `H:\vc-dist\` 或任意 C 盘目录）后双击即可正常安装；已实测静默安装 exit=0、装出的应用可正常启动。
+> 如需永久修复 H:\tmp，需要管理员执行 `icacls H:\tmp /setintegritylevel M`（本机当前无管理员权限，未执行）。
+
+> **离线 / 受限环境备用打包**：若 `npm run dist` 在下载 Electron 或末尾"执行安装包生成卸载器"步骤卡住（无头/沙箱环境常见），可复用本地已解压的 Electron 运行时与 NSIS 工具，分两步生成安装包：
 >
 > ```bash
 > # 1) 生成免安装程序目录（electronDist 指向本地已解压的 electron-v38.3.0-win32-x64）
 > npx electron-builder --dir --win --x64 -c.electronDist="C:\Users\<user>\AppData\Local\Temp\elec-run"
 >
 > # 2) 用 NSIS 直接编译安装包（脚本内 PROJECT_DIR 按实际路径调整）
-> makensis build/installer.nsi
+> makensis build/installer-manual.nsi
 > ```
 >
 > 产物：`release/垂直摄像头工作室 Setup 0.1.0.exe`（含完整程序数据、桌面/开始菜单快捷方式、注册表卸载信息）。
 > 注意：不要对编译好的 NSIS 安装包再跑 rcedit——它会重写 PE 头并截断尾部附加的安装数据。
-> 压缩方式：脚本用 `SetCompressor zlib`（非 solid）。早期用 `SetCompressor /SOLID lzma` 时，部分机器运行安装包弹出 `NSIS Error: Error writing temporary file. Make sure your temp folder is valid.`——SOLID 压缩把 300MB+ 载荷压成单一数据流，解压时对临时目录压力和容错要求高；zlib 分块压缩兼容性更好，代价是安装包从 87MB 增至 120MB。
+> 压缩方式：备用脚本用 `SetCompressor zlib`（非 solid）。早期用 `SetCompressor /SOLID lzma` 时，部分机器运行安装包弹出 `NSIS Error: Error writing temporary file. Make sure your temp folder is valid.`——SOLID 压缩把 300MB+ 载荷压成单一数据流，解压时对临时目录压力和容错要求高；zlib 分块压缩兼容性更好，代价是安装包从 87MB 增至 120MB。
 
 产物清单（`release/`）：
 
-- `垂直摄像头工作室 Setup 0.1.0.exe`：NSIS 安装包，双击安装后有桌面 / 开始菜单快捷方式，可在「应用和功能」卸载。
-- `垂直摄像头工作室 0.1.0.exe`：**portable 便携版**，双击即运行、免安装，适合临时使用或没有管理员权限的场景。
+- `VerticalCamStudio-Setup-0.1.0.exe`：**electron-builder 标准 NSIS 安装包**（85MB，7z/lzma 压缩），双击安装后有桌面 / 开始菜单快捷方式，可在「应用和功能」卸载。安装界面为英文（NSIS 模板不支持中文 productName 的非 UTF8 代码页编译），应用窗口仍是中文。
+- `VerticalCamStudio-Setup-0.1.0.exe.blockmap`：增量更新用块映射（可忽略）。
 - `win-unpacked/`：免安装程序目录，主 exe 可直接运行。
 
 > **关键构建配置：`asar: false`**：Electron 38 默认对 `app.asar` 做完整性校验（integrity hash），exe 里写死了 asar 的 SHA256。一旦 exe 与 asar 不是同一次构建产出（例如中途用 rcedit 改过 exe、或先 `--dir` 再手动 makensis 时混用了新旧 asar），hash 失配会导致程序**静默退出、点击无任何反应**。本项目在 `package.json` 的 `build` 中设 `asar: false`（代码以明文 `resources/app/` 目录发布，无 asar 校验环节），参考同类可正常运行的 Electron 项目配置。**重建务必保证 exe 与 app 内容来自同一次构建**：`--dir` 生成 `win-unpacked` 后，portalbe 构建会重打包 win-unpacked，因此 NSIS 安装包要在**最后一次** `--dir`/portable 之后再 makensis，避免混入旧文件。
@@ -118,6 +138,7 @@ npm run smoke
 | `npm` 报管道 `Access to the path '\\.\pipe\...' is denied` | 受限环境下进程 stdout 管道不可用 | 用 `cmd /c "npm install > out.log 2>&1"` |
 | electron 启动即崩 `TypeError: Cannot read properties of undefined (reading 'whenReady')` | 环境里设了 `ELECTRON_RUN_AS_NODE=1`，electron 退化成纯 Node | `Remove-Item Env:ELECTRON_RUN_AS_NODE` |
 | electron 启动崩 `0x80000003` / `0xC0000005` | ① 特定 electron 版本与本机图形/驱动组合冲突（实测 v32.3.3 崩、v38.3.0 正常）；② 从被监控/overlay 的盘（如某些工作区的 H: 盘）启动会崩，同一份二进制换到 C 盘即正常 | ① 换版本，本项目锁定 `electron@^38.3.0`；② 把 `node_modules\electron\dist` 整目录复制到 C 盘临时目录后再启动 |
+| NSIS 安装包报 `Error writing temporary file. Make sure your temp folder is valid.` | 安装包位于被标记为 Low 完整性的目录（本机 `H:\tmp` 被安全沙箱打了 `Mandatory Label\Low Mandatory Level` + Everyone 拒绝 ACE），NSIS 在该目录创建/删除临时文件被拒。与包内容无关——同一 exe 复制到 C 盘或 H:\ 根目录即可正常安装（已实测） | 把安装包复制到普通完整性目录再运行（如 `H:\vc-dist\`）；或用管理员执行 `icacls H:\tmp /setintegritylevel M` 永久修复 |
 
 ---
 

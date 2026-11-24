@@ -3,7 +3,7 @@
   "productName": "垂直摄像头工作室",
   "version": "0.1.0",
   "private": true,
-  "description": "垂直摄像头拍照 / 屏幕截图 / 缩放旋转裁剪 / 保存到指定文件夹",
+  "description": "Vertical camera photo capture, screen capture, crop/zoom/rotate and save to a folder",
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
@@ -13,8 +13,10 @@
     "dev": "electron . --dev",
     "smoke": "electron . --smoke",
     "test": "node --test",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "pack": "electron-builder --dir && node scripts/verify-installer.mjs",
+    "dist": "electron-builder && node scripts/verify-installer.mjs",
+    "dist:nsis": "node scripts/dist-nsis.mjs",
+    "verify": "node scripts/verify-installer.mjs"
   },
   "dependencies": {},
   "devDependencies": {
@@ -24,7 +26,7 @@
   },
   "build": {
     "appId": "com.local.verticalcamstudio",
-    "productName": "垂直摄像头工作室",
+    "productName": "Vertical Cam Studio",
     "asar": false,
     "npmRebuild": false,
     "directories": {
@@ -39,13 +41,19 @@
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "shortcutName": "Vertical Cam Studio",
+      "artifactName": "VerticalCamStudio-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "VerticalCamStudio-Portable-${version}.${ext}"
     }
   }
 }
