@@ -263,6 +263,8 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
   display: flex; align-items: center; justify-content: center;
 }
 .crop-stage img { display: block; max-width: 100%; max-height: 100%; }
+/* 无 src 时隐藏，避免浏览器显示 alt「待裁剪画面」与占位提示文字重叠 */
+.crop-stage img:not([src]) { display: none; }
 
 /* 交互模式提示：hover 徽标显示操作说明 */
 .mode-badge {

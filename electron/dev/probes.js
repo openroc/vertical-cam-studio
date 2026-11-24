@@ -1323,7 +1323,9 @@ async function runSmokeTest() {
         mode: window.__wb.getWorkspaceMode(),
         editing: panes.classList.contains('editing'),
         previewWidth: width(preview),
-        editWidth: width(edit)
+        editWidth: width(edit),
+        // 无 src 的裁剪图应隐藏，否则 alt「待裁剪画面」会与占位提示重叠
+        cropImgDisplay: getComputedStyle(document.getElementById('cropImage')).display
       });
       // 此时已载入测试图，应处于裁剪态
       const afterShot = snap();
@@ -1344,7 +1346,8 @@ async function runSmokeTest() {
       && workspaceProbe.afterShot.previewWidth < workspaceProbe.afterShot.editWidth
       && workspaceProbe.afterRecapture.mode === 'capture' && !workspaceProbe.afterRecapture.editing
       && workspaceProbe.afterRecapture.previewWidth > workspaceProbe.afterRecapture.editWidth
-      && workspaceProbe.afterRail.mode === 'edit' && workspaceProbe.afterRail.editing);
+      && workspaceProbe.afterRail.mode === 'edit' && workspaceProbe.afterRail.editing
+      && workspaceProbe.afterRail.cropImgDisplay === 'none');
     console.log('[smoke] 工作区切换结果:', JSON.stringify({ initial: probe.workspace, ...workspaceProbe, workspaceOk }));
 
     const report = {
