@@ -384,13 +384,20 @@ ipcMain.handle('settings:patch', (_e, patch) => {
 });
 
 ipcMain.handle('dialog:selectFolder', async () => {
-  const res = await dialog.showOpenDialog(mainWindow, {
+  // 窗口已关闭而 IPC 仍在排队时 mainWindow 为 null，显式转 undefined 避免个别版本抛错
+  const res = await dialog.showOpenDialog(mainWindow ?? undefined, {
     title: '选择保存文件夹',
     defaultPath: settings.outputDir || app.getPath('pictures'),
     properties: ['openDirectory', 'createDirectory']
   });
   if (res.canceled || !res.filePaths.length) return null;
-  settings.outputDir = res.filePaths[0];
+  // 与 settings:patch 共用同一份校验，避免这条路径绕过 outputDir 白名单
+  const dir = SETTINGS_VALIDATORS.outputDir(res.filePaths[0]);
+  if (!dir) {
+    console.warn('[settings] 拒绝非法输出目录:', res.filePaths[0]);
+    return null;
+  }
+  settings.outputDir = dir;
   persistSettings();
   return settings.outputDir;
 });
@@ -419,7 +426,7 @@ ipcMain.handle('image:save', async (_e, payload) => {
   }
 
   if (!dir) {
-    const res = await dialog.showSaveDialog(mainWindow, {
+    const res = await dialog.showSaveDialog(mainWindow ?? undefined, {
       title: '保存图片',
       defaultPath: path.join(app.getPath('pictures'), `${renderTemplate(filenameTemplate, prefix, counter)}.${ext}`),
       filters: [{ name: '图片', extensions: [ext] }]

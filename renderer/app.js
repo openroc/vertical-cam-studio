@@ -998,7 +998,17 @@ async function cropperToDataUrl() {
   return { dataUrl: canvas.toDataURL(`image/${format}`, quality), format, scale };
 }
 
+// 保存期间锁住入口：快速连按 Ctrl+S / 自动保存与手动保存重叠时，
+// 两次调用会拿到同一个 {n}（R5-4）。文件本身有 -1/-2 后缀兜底不会覆盖，
+// 但计数器语义会重复，这里直接串行化。
+let saveInFlight = false;
+
 async function saveCurrent({ silent = false } = {}) {
+  if (saveInFlight) {
+    setFooter('上一次保存尚未完成，请稍候');
+    return false;
+  }
+  saveInFlight = true;
   try {
     const { dataUrl, format, scale } = await cropperToDataUrl();
     // {n} 只在保存真正成功后消耗：取消对话框不应造成编号跳号
@@ -1034,6 +1044,8 @@ async function saveCurrent({ silent = false } = {}) {
     setFooter(`保存失败：${err.message}`);
     toast(`保存失败：${err.message}`, 'err');
     return false;
+  } finally {
+    saveInFlight = false;
   }
 }
 
