@@ -4,6 +4,9 @@
 /* 全局状态                                                            */
 /* ------------------------------------------------------------------ */
 
+/** 保存成功后的浮动预览停留时长（无操作自动消失） */
+const SAVE_PREVIEW_MS = 5000;
+
 const state = {
   settings: {
     outputDir: '',
@@ -29,7 +32,10 @@ const state = {
   /** 固定交互模式：select = 截取（默认）；pan = 拖动。点击模式徽标切换，Ctrl 按住为临时反向 */
   interactionMode: 'select',
   saveCounter: 0,
-  toastTimer: null
+  toastTimer: null,
+  /** 保存预览的自动消失定时器与当前停留时长（悬停时暂停） */
+  previewTimer: null,
+  previewDuration: SAVE_PREVIEW_MS
 };
 
 /** 右键/中键拖动画布（pan）的临时状态 */
@@ -121,6 +127,103 @@ function setStatus(text, kind = '') {
 
 function setFooter(text) {
   $('#statusText').textContent = text;
+}
+
+/* ------------------------------------------------------------------ */
+/* 保存后的浮动预览                                                     */
+/* ------------------------------------------------------------------ */
+
+/** 重置自动消失倒计时（缺省用当前停留时长，探针可传更短值加速验证） */
+function armSavePreviewTimer(durationMs = state.previewDuration) {
+  clearTimeout(state.previewTimer);
+  state.previewTimer = setTimeout(hideSavePreview, durationMs);
+}
+
+function previewBasename(p) {
+  const s = String(p);
+  const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+  return i >= 0 ? s.slice(i + 1) : s;
+}
+
+/** 保存成功后在右下角显示缩略图；重复保存会重置为新图并重新计时 */
+function showSavePreview(dataUrl, path, durationMs = SAVE_PREVIEW_MS) {
+  const box = $('#savePreview');
+  const img = $('#savePreviewImg');
+  const bar = $('#savePreviewBar');
+  if (!dataUrl || !box || !img) return;
+  clearTimeout(state.previewTimer);
+  state.previewDuration = durationMs;
+  img.src = dataUrl;
+  bar.textContent = path ? `✓ 已保存 · 点击放大 · ${previewBasename(path)}` : '✓ 已保存 · 点击放大';
+  bar.title = path || '';
+  box.hidden = false;
+  armSavePreviewTimer();
+}
+
+/** 关闭浮动预览并释放大图内存 */
+function hideSavePreview() {
+  clearTimeout(state.previewTimer);
+  state.previewTimer = null;
+  const box = $('#savePreview');
+  if (box) box.hidden = true;
+  const img = $('#savePreviewImg');
+  if (img) img.removeAttribute('src');
+}
+
+/** 打开放大遮罩层：先拷贝大图 src，再释放缩略图内存 */
+function openSavePreviewLightbox() {
+  const thumb = $('#savePreviewImg');
+  const full = $('#savePreviewFull');
+  const lightbox = $('#savePreviewLightbox');
+  const src = thumb && thumb.getAttribute('src');
+  if (!src || !full || !lightbox) return;
+  clearTimeout(state.previewTimer);
+  state.previewTimer = null;
+  full.src = src;
+  thumb.removeAttribute('src');
+  $('#savePreview').hidden = true;
+  lightbox.hidden = false;
+}
+
+function closeSavePreviewLightbox() {
+  const lightbox = $('#savePreviewLightbox');
+  if (lightbox) lightbox.hidden = true;
+  const full = $('#savePreviewFull');
+  if (full) full.removeAttribute('src');
+}
+
+/** 绑定浮动预览交互：悬停暂停、点击放大、关闭按钮、Esc */
+function bindSavePreview() {
+  const box = $('#savePreview');
+  const closeBtn = $('#savePreviewClose');
+  const lightbox = $('#savePreviewLightbox');
+  const lightboxClose = $('#lightboxClose');
+  if (!box || !closeBtn || !lightbox || !lightboxClose) return;
+
+  box.addEventListener('click', (e) => {
+    if (e.target.closest('#savePreviewClose')) return;
+    openSavePreviewLightbox();
+  });
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideSavePreview();
+  });
+  // 悬停暂停自动消失，移出后重新计时，避免用户正在看时突然消失
+  box.addEventListener('mouseenter', () => clearTimeout(state.previewTimer));
+  box.addEventListener('mouseleave', () => {
+    if (!box.hidden) armSavePreviewTimer();
+  });
+
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox || e.target === lightboxClose) closeSavePreviewLightbox();
+  });
+  lightboxClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeSavePreviewLightbox();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !lightbox.hidden) closeSavePreviewLightbox();
+  });
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -1097,6 +1200,8 @@ async function saveCurrent({ silent = false } = {}) {
     }
 
     state.saveCounter = counter;
+    // 保存成功后右下角弹出缩略图预览（静默保存不打扰）
+    if (!silent) showSavePreview(dataUrl, result.path);
 
     setFooter(`已保存：${result.path}`);
     if (!silent) {
@@ -1128,6 +1233,8 @@ function updateMaximizeButton(maximized) {
 }
 
 function bindEvents() {
+  bindSavePreview();
+
   // UI 使用统计：统一事件委托，所有按钮（含 data-stat 的 label）自动埋点。
   // 用稳定的 id / data-stat / data-rot 做键，避免用按钮文字（改名会断统计）。
   document.addEventListener('click', (e) => {
@@ -1409,6 +1516,15 @@ if (new URLSearchParams(location.search).has('vcsdev')) {
     getWorkspaceMode: () => state.workspaceMode,
     /** 固定交互模式：select | pan（供模式复位探针验证徽标与实际状态一致） */
     getInteractionMode: () => state.interactionMode,
+    /** 保存预览探针：显示/隐藏与状态查询（durationMs 可缩短以加速自动消失验证） */
+    showSavePreview,
+    hideSavePreview,
+    getSavePreviewState: () => ({
+      visible: !$('#savePreview').hidden,
+      hasSrc: !!$('#savePreviewImg').getAttribute('src'),
+      lightboxVisible: !$('#savePreviewLightbox').hidden,
+      timerActive: !!state.previewTimer
+    }),
     /** 只读设置副本 */
     getSettings: () => Object.assign({}, state.settings)
   };

@@ -788,6 +788,49 @@ async function runSmokeTest() {
 
     console.log('[smoke] 保存结果:', JSON.stringify(saveResult));
 
+    // 保存预览验证：显示缩略图 → 点开放大 → 关闭放大 → 关闭按钮 → 5 秒自动消失（探针缩到 150ms）
+    const previewProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
+      const wb = window.__wb;
+      const q = (s) => document.querySelector(s);
+      const st = () => wb.getSavePreviewState();
+      const out = {};
+      const cv = document.createElement('canvas');
+      cv.width = 160; cv.height = 100;
+      const cx = cv.getContext('2d');
+      cx.fillStyle = '#34c38f'; cx.fillRect(0, 0, 160, 100);
+      const durl = cv.toDataURL('image/png');
+
+      out.initiallyHidden = !st().visible && !st().hasSrc;
+
+      wb.showSavePreview(durl, 'C:/tmp/test-shot.png', 150);
+      out.shown = st().visible && st().hasSrc && st().timerActive;
+      out.srcIsCropped = q('#savePreviewImg').getAttribute('src') === durl;
+      out.barShowsName = q('#savePreviewBar').textContent.indexOf('test-shot.png') >= 0;
+
+      q('#savePreviewImg').click();
+      await new Promise((r) => setTimeout(r, 30));
+      out.lightboxOpened = st().lightboxVisible && !st().visible
+        && q('#savePreviewFull').getAttribute('src') === durl;
+
+      q('#lightboxClose').click();
+      await new Promise((r) => setTimeout(r, 30));
+      out.lightboxClosed = !st().lightboxVisible && !q('#savePreviewFull').getAttribute('src');
+
+      wb.showSavePreview(durl, 'x.png', 150);
+      q('#savePreviewClose').click();
+      out.closeButtonWorks = !st().visible && !st().hasSrc;
+
+      wb.showSavePreview(durl, 'y.png', 150);
+      await new Promise((r) => setTimeout(r, 320));
+      out.autoHides = !st().visible && !st().hasSrc;
+
+      return out;
+    })()`);
+    const previewOk = !!(previewProbe && previewProbe.initiallyHidden && previewProbe.shown
+      && previewProbe.srcIsCropped && previewProbe.barShowsName && previewProbe.lightboxOpened
+      && previewProbe.lightboxClosed && previewProbe.closeButtonWorks && previewProbe.autoHides);
+    console.log('[smoke] 保存预览结果:', JSON.stringify({ ...previewProbe, previewOk }));
+
     // Ctrl + 拖动平移验证：按住 Ctrl 把背景图拖动，检查画布位移
     const panResult = await getMainWindow().webContents.executeJavaScript(`(async () => {
       const cropper = window.__wb.getCropper();
@@ -1416,6 +1459,8 @@ async function runSmokeTest() {
       probe,
       saveResult,
       fileOk,
+      previewProbe,
+      previewOk,
       panResult,
       panOk,
       boxProbe,
@@ -1450,11 +1495,11 @@ async function runSmokeTest() {
     fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
-    const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && modeToggleOk && whiteboardOk
+    const allOk = probe.cropperLoaded && fileOk && previewOk && panOk && selectOk && panSelectOk && modeToggleOk && whiteboardOk
       && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && outputLayoutOk && windowControlsOk && workspaceOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
-      fileOk, panOk, selectOk, panSelectOk, modeToggleOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
+      fileOk, previewOk, panOk, selectOk, panSelectOk, modeToggleOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
       settingsWindowOk, outputLayoutOk, windowControlsOk, workspaceOk, allOk
     }));
     app.exit(allOk ? 0 : 2);

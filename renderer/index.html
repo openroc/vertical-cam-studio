@@ -126,6 +126,18 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <!-- 保存成功后的浮动预览：右下角缩略图，可点开放大，5 秒无操作自动消失 -->
+  <div id="savePreview" class="save-preview" hidden data-stat="savePreview" title="点击放大查看">
+    <button id="savePreviewClose" class="save-preview-close" title="关闭预览">×</button>
+    <img id="savePreviewImg" class="save-preview-img" alt="保存的图片预览，点击放大" />
+    <div id="savePreviewBar" class="save-preview-bar">✓ 已保存 · 点击放大</div>
+  </div>
+
+  <div id="savePreviewLightbox" class="lightbox" hidden title="点击空白处关闭">
+    <button id="lightboxClose" class="lightbox-close" title="关闭（Esc）">×</button>
+    <img id="savePreviewFull" class="lightbox-img" alt="保存的图片放大预览" />
+  </div>
+
   <script src="vendor/cropper.min.js"></script>
   <script src="core.js"></script>
   <script src="app.js"></script>
