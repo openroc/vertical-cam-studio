@@ -31,9 +31,13 @@
     </div>
   </header>
 
-  <main class="panes">
+  <main class="panes" id="panes">
     <!-- 左：摄像头实时预览 -->
-    <section class="pane">
+    <section class="pane" id="previewPane">
+      <button id="btnRailPreview" class="pane-rail" title="展开实时预览" data-stat="railPreview">
+        <span class="rail-arrow">›</span>
+        <span class="rail-text">实时预览</span>
+      </button>
       <h2 class="pane-title">实时预览</h2>
       <div id="previewStage" class="preview-stage">
         <div id="previewRot" class="preview-rot">
@@ -63,7 +67,11 @@
     </section>
 
     <!-- 右：裁剪工作台 -->
-    <section class="pane">
+    <section class="pane collapsed" id="editPane">
+      <button id="btnRailEdit" class="pane-rail" title="展开裁剪工作台" data-stat="railEdit">
+        <span class="rail-text">裁剪 / 缩放 / 旋转</span>
+        <span class="rail-arrow">‹</span>
+      </button>
       <div class="pane-heading">
         <h2 class="pane-title">裁剪 / 缩放 / 旋转</h2>
         <div id="modeBadge" class="mode-badge select" data-tip="按住 Ctrl + 拖动 = 拖动画面（平移）；松开 Ctrl 拖动 = 拉选取框；拖选区边角控制点可微调大小。">✂ 截取模式</div>

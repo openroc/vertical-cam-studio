@@ -24,6 +24,8 @@ const state = {
   stream: null,
   cropper: null,
   hasImage: false,
+  /** 工作区形态：capture = 左主右栏；edit = 左栏右主 */
+  workspaceMode: 'capture',
   saveCounter: 0,
   toastTimer: null
 };
@@ -295,6 +297,38 @@ function observePreviewSize() {
   previewResizeObserver.observe(previewStage);
 }
 
+/**
+ * 切换工作区形态：
+ * - capture（默认）：实时预览占主区，裁剪台收成右侧侧栏；
+ * - edit（出图后）：裁剪台占主区，实时预览收成左侧侧栏。
+ *
+ * 折叠用 display:none 实现，因此展开后必须让 cropperjs 重新量一次容器，
+ * 否则选区会按折叠前的尺寸定位。这里用 rAF 等布局稳定后再 resize。
+ */
+function setWorkspaceMode(mode) {
+  const editing = mode === 'edit';
+  const panes = document.getElementById('panes');
+  if (!panes) return;
+
+  state.workspaceMode = editing ? 'edit' : 'capture';
+  panes.classList.toggle('editing', editing);
+  const previewPane = document.getElementById('previewPane');
+  const editPane = document.getElementById('editPane');
+  if (previewPane) previewPane.classList.toggle('collapsed', editing);
+  if (editPane) editPane.classList.toggle('collapsed', !editing);
+
+  requestAnimationFrame(() => {
+    if (editing && state.cropper) {
+      try {
+        state.cropper.resize();
+      } catch (err) {
+        console.warn('[cropper] 布局切换后 resize 失败:', err.message);
+      }
+    }
+    layoutPreview();
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /* 拍照（把旋转/镜像校正烘焙进位图）                                   */
 /* ------------------------------------------------------------------ */
@@ -395,6 +429,9 @@ function loadImageIntoCropper(dataUrl, aspectHint) {
     };
 
     cropImage.onload = () => {
+      // 有图可裁 → 切到裁剪态（左栏右主）；放在 new Cropper 之前，
+      // 让裁剪器一开始就按展开后的容器尺寸初始化
+      setWorkspaceMode('edit');
       $('#cropEmpty').style.display = 'none';
       state.hasImage = true;
 
@@ -1147,8 +1184,12 @@ function bindEvents() {
     state.hasImage = false;
     $('#cropEmpty').style.display = 'flex';
     cropImage.removeAttribute('src');
+    setWorkspaceMode('capture');
     setFooter('已清空裁剪区');
   });
+  // 折叠侧栏可手动切回：保留已有裁剪结果，仅展开对应面板
+  $('#btnRailPreview').addEventListener('click', () => setWorkspaceMode('capture'));
+  $('#btnRailEdit').addEventListener('click', () => setWorkspaceMode('edit'));
   $('#btnSettings').addEventListener('click', () => {
     api.openSettings().catch((err) => toast(`打开设置失败：${err.message || err}`, 'err'));
   });
@@ -1291,6 +1332,9 @@ async function init() {
   const saved = await api.getSettings();
   state.settings = Object.assign(state.settings, saved || {});
 
+  // 默认拍照态：左主右栏；出图后再动态切到裁剪态
+  setWorkspaceMode('capture');
+
   // syncControlsFromSettings() 里已经包含 renderOutputDir() 与 updatePreviewFilter()
   syncControlsFromSettings();
 
@@ -1347,6 +1391,9 @@ if (new URLSearchParams(location.search).has('vcsdev')) {
     patchSettings,
     /** 当前裁剪器实例（探针需要在换图之后重新取） */
     getCropper: () => state.cropper,
+    /** 工作区形态：capture | edit（供布局探针验证） */
+    setWorkspaceMode,
+    getWorkspaceMode: () => state.workspaceMode,
     /** 只读设置副本 */
     getSettings: () => Object.assign({}, state.settings)
   };

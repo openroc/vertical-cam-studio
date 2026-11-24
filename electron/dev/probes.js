@@ -742,6 +742,16 @@ async function runSmokeTest() {
         rotTransform: q('#previewRot') ? q('#previewRot').style.transform : null,
         placeholderShown: q('#previewPlaceholder') ? q('#previewPlaceholder').style.display : null,
         outputDir: q('#outputDir') ? q('#outputDir').textContent : null,
+        workspace: (() => {
+          const preview = q('#previewPane');
+          const edit = q('#editPane');
+          return {
+            mode: window.__wb.getWorkspaceMode(),
+            editing: q('#panes').classList.contains('editing'),
+            previewWidth: preview ? Math.round(preview.getBoundingClientRect().width) : 0,
+            editWidth: edit ? Math.round(edit.getBoundingClientRect().width) : 0
+          };
+        })(),
         toast: (q('#toast') && !q('#toast').hidden) ? q('#toast').textContent : null,
         topmost,
         frame
@@ -1280,6 +1290,40 @@ async function runSmokeTest() {
       && windowControlsProbe.second === false && windowControlsProbe.after === false);
     console.log('[smoke] 窗口控制结果:', JSON.stringify(windowControlsProbe));
 
+    // 回归探针：拍照态（左主右栏）<-> 裁剪态（左栏右主）动态切换
+    const workspaceProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
+      const panes = document.getElementById('panes');
+      const preview = document.getElementById('previewPane');
+      const edit = document.getElementById('editPane');
+      const width = (el) => Math.round(el.getBoundingClientRect().width);
+      const snap = () => ({
+        mode: window.__wb.getWorkspaceMode(),
+        editing: panes.classList.contains('editing'),
+        previewWidth: width(preview),
+        editWidth: width(edit)
+      });
+      // 此时已载入测试图，应处于裁剪态
+      const afterShot = snap();
+      // 重新拍摄 → 回到拍照态
+      document.getElementById('btnRecapture').click();
+      await new Promise((r) => setTimeout(r, 100));
+      const afterRecapture = snap();
+      // 折叠侧栏手动切回裁剪态
+      document.getElementById('btnRailEdit').click();
+      await new Promise((r) => setTimeout(r, 100));
+      const afterRail = snap();
+      return { afterShot, afterRecapture, afterRail };
+    })()`);
+    const initialCaptureOk = !!(probe.workspace && probe.workspace.mode === 'capture'
+      && !probe.workspace.editing && probe.workspace.previewWidth > probe.workspace.editWidth);
+    const workspaceOk = !!(initialCaptureOk && workspaceProbe
+      && workspaceProbe.afterShot.mode === 'edit' && workspaceProbe.afterShot.editing
+      && workspaceProbe.afterShot.previewWidth < workspaceProbe.afterShot.editWidth
+      && workspaceProbe.afterRecapture.mode === 'capture' && !workspaceProbe.afterRecapture.editing
+      && workspaceProbe.afterRecapture.previewWidth > workspaceProbe.afterRecapture.editWidth
+      && workspaceProbe.afterRail.mode === 'edit' && workspaceProbe.afterRail.editing);
+    console.log('[smoke] 工作区切换结果:', JSON.stringify({ initial: probe.workspace, ...workspaceProbe, workspaceOk }));
+
     const report = {
       probe,
       saveResult,
@@ -1303,6 +1347,8 @@ async function runSmokeTest() {
       settingsWindowOk,
       windowControlsProbe,
       windowControlsOk,
+      workspaceProbe,
+      workspaceOk,
       usageProbe,
       usageFilesOk,
       usageOk,
@@ -1313,11 +1359,11 @@ async function runSmokeTest() {
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
     const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && whiteboardOk
-      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && windowControlsOk;
+      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && windowControlsOk && workspaceOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
       fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
-      settingsWindowOk, windowControlsOk, allOk
+      settingsWindowOk, windowControlsOk, workspaceOk, allOk
     }));
     app.exit(allOk ? 0 : 2);
   } catch (err) {

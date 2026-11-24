@@ -160,11 +160,13 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
 .panes {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.25fr);
+  /* 默认拍照态：左主区 + 右侧折叠栏；切到 .editing 后左右互换 */
+  grid-template-columns: minmax(0, 1fr) 72px;
   gap: 14px;
   padding: 14px 16px;
   min-height: 0;
 }
+.panes.editing { grid-template-columns: 72px minmax(0, 1fr); }
 
 .pane {
   background: var(--bg-soft);
@@ -175,6 +177,37 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
   flex-direction: column;
   min-height: 0;
 }
+
+/* 拍照 / 裁剪两态动态切换：折叠的一只剩一条可点击的竖排侧栏 */
+.pane-rail { display: none; }
+.pane.collapsed {
+  padding: 10px 4px;
+  align-items: center;
+  overflow: hidden;
+}
+.pane.collapsed > :not(.pane-rail) { display: none !important; }
+.pane.collapsed .pane-rail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0;
+  background: transparent;
+}
+.pane-rail .rail-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pane-rail .rail-arrow { font-size: 18px; color: var(--accent); line-height: 1; }
+.pane-rail:hover { background: var(--accent-soft); border-color: var(--accent); }
+.pane-rail:hover .rail-text { color: var(--text); }
 
 .pane-title { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600; letter-spacing: .5px; }
 .pane-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
