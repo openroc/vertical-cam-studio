@@ -35,11 +35,12 @@
   function sanitizeName(name) {
     let out = String(name)
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
-      .replace(/\s+/g, ' ')
-      .trim()
-      // Win32 不允许文件名以「点」或「空格」结尾
-      .replace(/[. ]+$/g, '')
-      .slice(0, 120);
+    .replace(/\s+/g, ' ')
+    .trim()
+    // 必须先截断再去尾部点/空格：反过来会在截断边界重新造出
+    // Win32 非法的结尾（实测 120 字符处恰好是空格或点时会踩到）。
+    .slice(0, 120)
+    .replace(/[. ]+$/g, '');
     if (!out) out = 'shot';
     if (WINDOWS_RESERVED.test(out)) out = `_${out}`;
     return out;

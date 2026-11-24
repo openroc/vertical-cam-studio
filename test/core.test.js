@@ -39,6 +39,17 @@ test('sanitizeName: 长度上限 120', () => {
   assert.strictEqual(core.sanitizeName('x'.repeat(300)).length, 120);
 });
 
+test('sanitizeName: 120 字符边界不会重新产生尾点/尾空格（R5-3）', () => {
+  const withSpace = core.sanitizeName('a' + 'x'.repeat(118) + ' ' + 'b');
+  const withDot = core.sanitizeName('a' + 'x'.repeat(117) + ' .' + 'b');
+  assert.ok(withSpace.length <= 120);
+  assert.ok(withDot.length <= 120);
+  assert.doesNotMatch(withSpace, /[. ]$/);
+  assert.doesNotMatch(withDot, /[. ]$/);
+  assert.ok(withSpace.startsWith('a'));
+  assert.ok(withDot.startsWith('a'));
+});
+
 /* ------------------------------------------------------------------ */
 /* renderTemplate                                                      */
 /* ------------------------------------------------------------------ */
