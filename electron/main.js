@@ -174,6 +174,13 @@ const probes = require('./dev/probes.js').createProbes({
 /* 窗口                                                                */
 /* ------------------------------------------------------------------ */
 
+/** 把主窗口的最大化状态广播给渲染层，同步自定义窗口按钮图标 */
+function notifyWindowState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('window:state-changed', { maximized: mainWindow.isMaximized() });
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -181,6 +188,8 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 640,
     show: false,
+    // 去掉系统标题栏（含原生最小化/最大化/关闭），改用顶栏自定义按钮
+    frame: false,
     backgroundColor: '#12141a',
     title: '垂直摄像头工作室',
     webPreferences: {
@@ -200,6 +209,10 @@ function createWindow() {
     path.join(__dirname, '..', 'renderer', 'index.html'),
     IS_DEV_TOOLS ? { query: { vcsdev: '1' } } : {}
   );
+
+  // 双击顶栏等路径也会改变最大化状态，统一广播给渲染层
+  mainWindow.on('maximize', notifyWindowState);
+  mainWindow.on('unmaximize', notifyWindowState);
 
   // 把渲染层日志转发到主进程 stdout，便于 --smoke 自检时排查
   mainWindow.webContents.on('console-message', (_e, level, message, line, sourceId) => {
@@ -387,6 +400,26 @@ async function writeUniqueFile(dir, baseName, ext, buffer) {
 
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:open', () => openSettingsWindow());
+
+/* 自定义标题栏的窗口控制：只能操作主窗口，且只允许这几个固定动作 */
+ipcMain.handle('window:state', () => ({
+  ok: true,
+  maximized: !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized())
+}));
+ipcMain.handle('window:minimize', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
+  return { ok: true };
+});
+ipcMain.handle('window:toggleMaximize', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, maximized: false };
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  else mainWindow.maximize();
+  return { ok: true, maximized: mainWindow.isMaximized() };
+});
+ipcMain.handle('window:close', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  return { ok: true };
+});
 
 /** UI 按钮埋点：渲染层 fire-and-forget，主进程校验 identifier 后本地落盘 */
 ipcMain.on('stats:button', (_e, rawId) => {

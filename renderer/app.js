@@ -1057,6 +1057,14 @@ async function saveCurrent({ silent = false } = {}) {
 /* 事件绑定                                                            */
 /* ------------------------------------------------------------------ */
 
+/** 自定义标题栏的最大化按钮：在最大化/还原之间切换图标与提示 */
+function updateMaximizeButton(maximized) {
+  const btn = $('#btnMaximize');
+  if (!btn) return;
+  btn.textContent = maximized ? '❐' : '□';
+  btn.title = maximized ? '还原' : '最大化';
+}
+
 function bindEvents() {
   // UI 使用统计：统一事件委托，所有按钮（含 data-stat 的 label）自动埋点。
   // 用稳定的 id / data-stat / data-rot 做键，避免用按钮文字（改名会断统计）。
@@ -1143,6 +1151,25 @@ function bindEvents() {
   });
   $('#btnSettings').addEventListener('click', () => {
     api.openSettings().catch((err) => toast(`打开设置失败：${err.message || err}`, 'err'));
+  });
+
+  // 无边框窗口的自定义控制
+  $('#btnMinimize').addEventListener('click', () => api.minimizeWindow());
+  $('#btnMaximize').addEventListener('click', () => {
+    api.toggleMaximize().then((res) => {
+      if (res && typeof res.maximized === 'boolean') updateMaximizeButton(res.maximized);
+    });
+  });
+  $('#btnClose').addEventListener('click', () => api.closeWindow());
+  // 双击顶栏空白处切换最大化（与常规窗口习惯一致）
+  document.querySelector('.topbar').addEventListener('dblclick', (e) => {
+    if (e.target.closest('button, select, label')) return;
+    api.toggleMaximize().then((res) => {
+      if (res && typeof res.maximized === 'boolean') updateMaximizeButton(res.maximized);
+    });
+  });
+  api.onWindowStateChanged((state) => {
+    if (state && typeof state.maximized === 'boolean') updateMaximizeButton(state.maximized);
   });
 
   // 快捷键
@@ -1255,6 +1282,11 @@ async function init() {
   if (typeof WhCore === 'undefined') {
     toast('core.js 未加载，纯函数不可用', 'err');
   }
+
+  // 自定义标题栏启动时要反映真实窗口状态（上次最大化退出等）
+  api.getWindowState()
+    .then((state) => state && updateMaximizeButton(!!state.maximized))
+    .catch(() => {});
 
   const saved = await api.getSettings();
   state.settings = Object.assign(state.settings, saved || {});

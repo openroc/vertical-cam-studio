@@ -13,6 +13,17 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('settings:changed', listener);
   },
 
+  /** 无边框主窗口的自定义控制 */
+  getWindowState: () => ipcRenderer.invoke('window:state'),
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+  closeWindow: () => ipcRenderer.invoke('window:close'),
+  onWindowStateChanged: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('window:state-changed', listener);
+    return () => ipcRenderer.removeListener('window:state-changed', listener);
+  },
+
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
   /**

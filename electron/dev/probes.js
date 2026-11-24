@@ -1260,6 +1260,26 @@ async function runSmokeTest() {
       && settingsWindowProbe.rolledBack && settingsWindowProbe.notBad);
     console.log('[smoke] 设置窗口结果:', JSON.stringify(settingsWindowProbe));
 
+    // 回归探针：无边框窗口的三个自定义控制按钮存在，最大化/还原可往返
+    const windowControlsProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
+      const buttons = ['btnMinimize', 'btnMaximize', 'btnClose'].every((id) => !!document.getElementById(id));
+      const before = await window.api.getWindowState();
+      const first = await window.api.toggleMaximize();
+      const second = await window.api.toggleMaximize();
+      const after = await window.api.getWindowState();
+      return {
+        buttons,
+        before: before.maximized,
+        first: first.maximized,
+        second: second.maximized,
+        after: after.maximized
+      };
+    })()`);
+    const windowControlsOk = !!(windowControlsProbe && windowControlsProbe.buttons
+      && windowControlsProbe.before === false && windowControlsProbe.first === true
+      && windowControlsProbe.second === false && windowControlsProbe.after === false);
+    console.log('[smoke] 窗口控制结果:', JSON.stringify(windowControlsProbe));
+
     const report = {
       probe,
       saveResult,
@@ -1281,6 +1301,8 @@ async function runSmokeTest() {
       rejectOk,
       settingsWindowProbe,
       settingsWindowOk,
+      windowControlsProbe,
+      windowControlsOk,
       usageProbe,
       usageFilesOk,
       usageOk,
@@ -1291,10 +1313,11 @@ async function runSmokeTest() {
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
     const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && whiteboardOk
-      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk;
+      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && windowControlsOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
-      fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk, settingsWindowOk, allOk
+      fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
+      settingsWindowOk, windowControlsOk, allOk
     }));
     app.exit(allOk ? 0 : 2);
   } catch (err) {

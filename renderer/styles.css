@@ -39,6 +39,28 @@ body {
   border-bottom: 1px solid var(--bg-line);
 }
 
+/* 主窗口无系统标题栏：顶栏整体可拖动，交互控件必须排除在外 */
+body:not(.settings-body) .topbar { -webkit-app-region: drag; }
+body:not(.settings-body) .topbar button,
+body:not(.settings-body) .topbar select,
+body:not(.settings-body) .topbar label,
+body:not(.settings-body) .topbar .status-chip { -webkit-app-region: no-drag; }
+
+.window-controls {
+  display: flex;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 1px solid var(--bg-line);
+}
+.win-btn {
+  width: 30px;
+  padding: 4px 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.2;
+}
+.win-btn.close:hover { background: #c42b1c; border-color: #c42b1c; color: #fff; }
+
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .5px; }
 .dot {
