@@ -13,7 +13,8 @@ const CONTROL_KEYS = {
   whiteboardRange: 'whiteboardContrast',
   binarizeCheck: 'binarize',
   whiteboardSoftCheck: 'whiteboardSoft',
-  exportScaleSelect: 'exportScale'
+  exportScaleSelect: 'exportScale',
+  outputDir: 'outputDir'
 };
 
 let settings = {};
@@ -73,6 +74,14 @@ function fillControls(only, skipFocused = false) {
   if (want('exportScale', 'exportScaleSelect')) {
     $('#exportScaleSelect').value = String(settings.exportScale ?? 'auto');
   }
+  if (want('outputDir', 'outputDir')) renderOutputDir();
+}
+
+function renderOutputDir() {
+  const el = $('#outputDir');
+  if (!el) return;
+  el.textContent = settings.outputDir || '（未设置）';
+  el.title = settings.outputDir || '';
 }
 
 /** 写回设置；以主进程返回的权威值为准，被拒绝的键立刻把控件拉回原值 */
@@ -134,6 +143,19 @@ function bindEvents() {
   $('#binarizeCheck').addEventListener('change', (e) => patch({ binarize: e.target.checked }));
   $('#whiteboardSoftCheck').addEventListener('change', (e) => patch({ whiteboardSoft: e.target.checked }));
   $('#exportScaleSelect').addEventListener('change', (e) => patch({ exportScale: e.target.value }));
+
+  // 选择输出目录：主进程 dialog:selectFolder 校验并持久化后广播，两个窗口同步刷新
+  $('#btnPickFolder').addEventListener('click', async () => {
+    try {
+      const dir = await api.selectFolder();
+      if (!dir) return;
+      settings = Object.assign({}, settings, { outputDir: dir });
+      renderOutputDir();
+      setStatus('输出目录已更新', 'live');
+    } catch (err) {
+      setStatus(`选择失败：${err.message || err}`, 'err');
+    }
+  });
 
   $('#btnCloseSettings').addEventListener('click', () => window.close());
   document.addEventListener('keydown', (e) => {

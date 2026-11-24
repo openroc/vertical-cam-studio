@@ -1162,19 +1162,10 @@ function bindEvents() {
   $('#btnFlipH').addEventListener('click', () => state.cropper && state.cropper.scaleX(-state.cropper.getData().scaleX));
   $('#aspectSelect').addEventListener('change', (e) => setAspect(e.target.value));
 
-  // 输出目录
-  $('#btnPickFolder').addEventListener('click', async () => {
-    const dir = await api.selectFolder();
-    if (dir) {
-      state.settings.outputDir = dir;
-      renderOutputDir();
-      setFooter(`输出目录已设为 ${dir}`);
-      toast('输出目录已更新', 'ok');
-    }
-  });
+  // 输出目录的「选择…」已迁到设置页；主界面只保留「打开」按钮
   $('#btnOpenFolder').addEventListener('click', () => {
     if (state.settings.outputDir) api.openPath(state.settings.outputDir);
-    else toast('尚未选择输出目录', 'err');
+    else toast('尚未选择输出目录，请在设置页指定', 'err');
   });
 
   // 保存 / 重拍 / 设置
@@ -1232,7 +1223,8 @@ function bindEvents() {
       saveCurrent();
     } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyO') {
       e.preventDefault();
-      $('#btnPickFolder').click();
+      if (api.trackButton) api.trackButton('btnSettings'); // 输出目录选择已迁到设置页
+      api.openSettings();
     }
   });
 
@@ -1306,14 +1298,9 @@ function syncControlsFromSettings(only) {
   // 保存设置已迁到独立设置窗口；主界面只同步这里仍然可见的控件
   if (want('mirror')) $('#btnMirror').classList.toggle('active', !!state.settings.mirror);
   if (want('rotation')) syncRotationButtons();
-  if (want('outputDir')) renderOutputDir();
+  // outputDir 的显示与选择已迁到设置页，主界面只保留 state.settings 里的值供「打开」按钮使用
   // 白板 / 二值化 / 强度由设置窗口修改后经广播同步过来，预览滤镜要跟着刷新
   if (want('whiteboard') || want('whiteboardContrast') || want('binarize')) updatePreviewFilter();
-}
-
-function renderOutputDir() {
-  $('#outputDir').textContent = state.settings.outputDir || '（未设置）';
-  $('#outputDir').title = state.settings.outputDir || '';
 }
 
 async function init() {
@@ -1335,7 +1322,7 @@ async function init() {
   // 默认拍照态：左主右栏；出图后再动态切到裁剪态
   setWorkspaceMode('capture');
 
-  // syncControlsFromSettings() 里已经包含 renderOutputDir() 与 updatePreviewFilter()
+  // syncControlsFromSettings() 会同步镜像/旋转/预览滤镜（outputDir 显示已迁到设置页）
   syncControlsFromSettings();
 
   // 独立设置窗口改动后，主进程会广播权威设置；本地副本跟着更新并刷新预览

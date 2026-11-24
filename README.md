@@ -21,7 +21,7 @@
 | 裁剪 | cropperjs 拖拽选框 + 比例锁定 | 自由 / 16:9 / 4:3 / 3:4 / 1:1 / 原图 |
 | **白板模式** | 灰度化 + 对比度增强（可选 Otsu 二值化） | 保存前对裁剪结果做像素级处理，提升 OCR/识别效率 |
 | **导出倍率** | `renderer/app.js` `resolveExportScale()` | 裁剪块太小时按 1~3× 放大再保存，实测可把 `\|\|`→`[]` 的误读率清零 |
-| 保存到指定文件夹 | `electron/main.js` `dialog:selectFolder` | 右侧截图下方「选择…」任选目录，配置持久化到 `userData/settings.json`；同名文件自动加 `-1/-2` 后缀 |
+| 保存到指定文件夹 | `electron/main.js` `dialog:selectFolder` | 设置页「输出目录」卡片点「选择…」任选目录，配置持久化到 `userData/settings.json`；同名文件自动加 `-1/-2` 后缀。主界面「比例」组右侧的「打开」按钮可快速打开该目录 |
 
 额外：文件名模板（`{prefix}` `{timestamp}` `{date}` `{time}` `{n}`）、JPEG 质量调节、PNG 无损输出、拍照后自动保存、多摄像头切换与热插拔。这些选项都在**独立的「设置…」窗口**中（主界面顶栏右上角入口，修改后自动保存，Esc 或「关闭」退出）。
 

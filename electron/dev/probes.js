@@ -1256,6 +1256,8 @@ async function runSmokeTest() {
             ok: true,
             cards: document.querySelectorAll('.settings-card').length,
             configDir: document.querySelector('#configDir') ? document.querySelector('#configDir').textContent : '',
+            outputDir: document.querySelector('#outputDir') ? document.querySelector('#outputDir').textContent : '',
+            hasPickFolder: !!document.querySelector('#btnPickFolder'),
             rolledBack: input.value === before,
             notBad: input.value !== bad
           };
@@ -1267,11 +1269,29 @@ async function runSmokeTest() {
       }
     })();
     const settingsWindowOk = !!(settingsWindowProbe && settingsWindowProbe.ok
-      && settingsWindowProbe.cards === 5
+      && settingsWindowProbe.cards === 6
       && (settingsWindowProbe.configDir || '').length > 3
       && settingsWindowProbe.configDir !== '（读取中…）' && settingsWindowProbe.configDir !== '（读取失败）'
+      && settingsWindowProbe.hasPickFolder
+      && (settingsWindowProbe.outputDir || '').length > 1
       && settingsWindowProbe.rolledBack && settingsWindowProbe.notBad);
     console.log('[smoke] 设置窗口结果:', JSON.stringify(settingsWindowProbe));
+
+    // 回归探针：输出目录控件已迁走，「打开」按钮移到比例组右侧
+    const outputLayoutProbe = await getMainWindow().webContents.executeJavaScript(`(() => {
+      const aspectGroup = document.querySelector('#aspectSelect')?.closest('.group');
+      const openBtn = document.querySelector('#btnOpenFolder');
+      const openInAspect = !!(aspectGroup && openBtn && aspectGroup.contains(openBtn));
+      return {
+        mainHasPickFolder: !!document.querySelector('#btnPickFolder'),
+        mainHasOutputDir: !!document.querySelector('#outputDir'),
+        openInAspect,
+        openIsSelectNextSibling: !!(openBtn && document.querySelector('#aspectSelect')?.nextElementSibling === openBtn)
+      };
+    })()`);
+    const outputLayoutOk = !outputLayoutProbe.mainHasPickFolder && !outputLayoutProbe.mainHasOutputDir
+      && outputLayoutProbe.openInAspect && outputLayoutProbe.openIsSelectNextSibling;
+    console.log('[smoke] 输出目录布局结果:', JSON.stringify(outputLayoutProbe));
 
     // 回归探针：无边框窗口的三个自定义控制按钮存在，最大化/还原可往返
     const windowControlsProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
@@ -1348,6 +1368,8 @@ async function runSmokeTest() {
       rejectOk,
       settingsWindowProbe,
       settingsWindowOk,
+      outputLayoutProbe,
+      outputLayoutOk,
       windowControlsProbe,
       windowControlsOk,
       workspaceProbe,
@@ -1362,11 +1384,11 @@ async function runSmokeTest() {
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
     const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && whiteboardOk
-      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && windowControlsOk && workspaceOk;
+      && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && outputLayoutOk && windowControlsOk && workspaceOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
       fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
-      settingsWindowOk, windowControlsOk, workspaceOk, allOk
+      settingsWindowOk, outputLayoutOk, windowControlsOk, workspaceOk, allOk
     }));
     app.exit(allOk ? 0 : 2);
   } catch (err) {

@@ -507,6 +507,7 @@ ipcMain.handle('dialog:selectFolder', async () => {
   }
   settings.outputDir = dir;
   persistSettings();
+  broadcastSettings();
   return settings.outputDir;
 });
 
