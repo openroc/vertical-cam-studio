@@ -1085,8 +1085,20 @@ async function runSmokeTest() {
       key('keyup', false);
       out.ctrlBackToSelect = text().indexOf('截取') >= 0 && dragMode() === 'crop';
 
-      // 结束时确保停在固定截取，避免影响后续探针
-      if (text().indexOf('拖动') >= 0) click();
+      // 回归：固定拖动模式下载入新图（截图/导入图片），固定模式须复位到截取，
+      // 且徽标显示与实际模式一致（旧 bug：徽标显示截取但 state 仍是 pan）
+      click(); // → 固定拖动
+      const modeBeforeLoad = window.__wb.getInteractionMode();
+      const c = document.createElement('canvas');
+      c.width = 200; c.height = 120;
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#3a7bd5'; cx.fillRect(0, 0, 200, 120);
+      cx.fillStyle = '#fff'; cx.fillRect(20, 20, 60, 40);
+      await window.__wb.loadImageIntoCropper(c.toDataURL('image/png'), NaN);
+      out.reloadWasPan = modeBeforeLoad === 'pan';
+      out.reloadResetMode = window.__wb.getInteractionMode() === 'select';
+      out.reloadBadgeMatch = text().indexOf('截取') >= 0 && dragMode() === 'crop';
+
       return out;
     })()`);
     const modeToggleOk = !!(modeToggleProbe && Object.values(modeToggleProbe).every(Boolean));

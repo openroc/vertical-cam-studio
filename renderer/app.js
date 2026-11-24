@@ -415,7 +415,9 @@ function loadImageIntoCropper(dataUrl, aspectHint) {
   pan.ctrlDown = false;
   selection.active = false;
   document.body.classList.remove('panning', 'selecting');
-  setInteractionMode('select');
+  // 复位固定模式并同步徽标/光标（只调 setInteractionMode 会改显示但不改固定状态，导致徽标与实际模式不一致）
+  state.interactionMode = 'select';
+  refreshInteractionMode();
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -1405,6 +1407,8 @@ if (new URLSearchParams(location.search).has('vcsdev')) {
     /** 工作区形态：capture | edit（供布局探针验证） */
     setWorkspaceMode,
     getWorkspaceMode: () => state.workspaceMode,
+    /** 固定交互模式：select | pan（供模式复位探针验证徽标与实际状态一致） */
+    getInteractionMode: () => state.interactionMode,
     /** 只读设置副本 */
     getSettings: () => Object.assign({}, state.settings)
   };
