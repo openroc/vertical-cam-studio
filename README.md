@@ -97,12 +97,21 @@ vertical-cam-studio/
 │   ├── main.js          # 窗口、设置持久化、文件夹选择、保存文件、屏幕截图
 │   └── preload.js       # contextBridge 暴露的受限 API
 ├── renderer/
-│   ├── index.html       # 界面
+│   ├── index.html       # 界面（含 CSP）
 │   ├── styles.css       # 暗色主题
 │   ├── app.js           # 预览 / 拍照 / cropperjs / 保存
+│   ├── core.js          # 主进程与渲染层共用的纯函数（文件名、Otsu、统计）
 │   └── vendor/          # postinstall 自动生成（cropperjs.min.js|css）
 ├── scripts/
-│   └── copy-vendor.mjs  # 复制 cropperjs dist → renderer/vendor
+│   ├── copy-vendor.mjs  # 复制 cropperjs dist → renderer/vendor
+│   ├── png-ascii.mjs    # PNG → 字符画（白板笔画分析）
+│   ├── analyze-line.mjs # 行内笔画切分
+│   ├── profile-row.mjs  # 灰阶剖面
+│   └── vlm-ocr.mjs      # 本地 VLM 批量 OCR 对照
+├── test/
+│   └── core.test.js     # 纯函数单测（node --test）
+├── CODE_REVIEW*.md      # 五轮代码审查报告
+├── start.ps1 / start.cmd / audit.cmd  # 启动与自检脚本
 ├── package.json
 ├── logs/                 # 历史调试日志（非必需，可随时删）
 └── LICENSE              # MIT
@@ -113,7 +122,7 @@ vertical-cam-studio/
 | 项 | 做法 |
 | --- | --- |
 | 渲染进程 | `contextIsolation: true` + `nodeIntegration: false` + **`sandbox: true`**，preload 只暴露 `contextBridge` 白名单 API |
-| CSP | `default-src 'self'; style-src 'self'; script-src 'self'`（已去掉 `unsafe-inline`） |
+| CSP | `default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'`（无 `unsafe-inline`） |
 | 外部链接 | 只放行 `http:` / `https:`，其余协议一律拒绝 |
 | 摄像头权限 | 仅对本地 `file://` 页面放行 `media` / `display-capture` |
 | 打开文件 | `shell:openPath` / `showItemInFolder` 只允许**输出目录之内**的路径，且文件类型限图片/文档 |
@@ -131,8 +140,8 @@ vertical-cam-studio/
 
 | 文件 | 位置 | 内容 |
 | --- | --- | --- |
-| `ui-usage.json` | `app.getPath('userData')` | 聚合数据：`total`、按天总数 `days`、每个按钮的 `count` / `first` / `last` / `days`（只留最近 90 天） |
-| `ui-usage.log` | 同上 | 明细日志：每次点击一行 JSON `{"t":"ISO 时间","id":"按钮标识"}`，超过 512KB 时只保留最近 2000 行 |
+| `ui-usage.json` | `app.getPath('userData')` | 聚合数据：`total`、按天总数 `days`、每个按钮的 `count` / `first` / `last` / `days`；其中 **`days` 映射只留最近 90 天，`total` 与 `count` 为累计值** |
+| `ui-usage.log` | 同上 | 明细日志：每次点击一行 JSON `{"t":"ISO 时间","id":"按钮标识"}`，800ms 防抖批量写入，超过 512KB 时只保留最近 2000 行 |
 
 按钮标识用元素 `id`（如 `btnShot`），旋转按钮用 `rot0/rot90/rot180/rot270`，导入标签用 `importImage`；
 快捷键复用对应按钮的标识，方便按功能合并看使用频率。统计文件可在状态栏「配置目录」下找到。

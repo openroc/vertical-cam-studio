@@ -111,37 +111,47 @@ function loadUsage() {
 
 let usage = null;
 let usageTimer = null;
+// 明细日志与聚合共用同一个防抖窗口：高频点击时一次写多行，
+// 避免每条点击都在主进程事件循环里做同步磁盘 IO（R5-6）
+let pendingLogLines = [];
 
 function flushUsage() {
   if (usageTimer) {
     clearTimeout(usageTimer);
     usageTimer = null;
   }
-  if (!usage) return;
-  try {
-    const file = usageFile();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(usage, null, 2), 'utf8');
-    fs.renameSync(tmp, file);
-  } catch (err) {
-    console.warn('[usage] 聚合统计写入失败:', err.message);
+  if (usage) {
+    try {
+      const file = usageFile();
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const tmp = `${file}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(usage, null, 2), 'utf8');
+      fs.renameSync(tmp, file);
+    } catch (err) {
+      console.warn('[usage] 聚合统计写入失败:', err.message);
+    }
+  }
+  if (pendingLogLines.length) {
+    const file = usageLogFile();
+    const lines = pendingLogLines;
+    pendingLogLines = [];
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.appendFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+      if (fs.statSync(file).size > 512 * 1024) {
+        const kept = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-2000);
+        fs.writeFileSync(file, `${kept.join('\n')}\n`, 'utf8');
+      }
+    } catch (err) {
+      console.warn('[usage] 明细日志写入失败:', err.message);
+      pendingLogLines = lines.concat(pendingLogLines); // 写失败留到下次 flush 重试
+    }
   }
 }
 
-/** 明细日志：一行一条 JSON，超过 512KB 时只保留最近 2000 行 */
+/** 明细日志入队，真正落盘由 flushUsage() 统一完成 */
 function appendUsageLog(t, id) {
-  const file = usageLogFile();
-  try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.appendFileSync(file, `${JSON.stringify({ t, id })}\n`, 'utf8');
-    if (fs.statSync(file).size > 512 * 1024) {
-      const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
-      fs.writeFileSync(file, `${lines.slice(-2000).join('\n')}\n`, 'utf8');
-    }
-  } catch (err) {
-    console.warn('[usage] 明细日志写入失败:', err.message);
-  }
+  pendingLogLines.push(JSON.stringify({ t, id }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,19 +215,19 @@ function createWindow() {
     }
   });
 
-mainWindow.on('close', (e) => {
-  if (devJobRunning) {
-    e.preventDefault();
-    console.log('[window] 开发任务进行中，忽略关闭请求');
-    return;
-  }
-  console.log('[window] close');
-});
+  mainWindow.on('close', (e) => {
+    if (devJobRunning) {
+      e.preventDefault();
+      console.log('[window] 开发任务进行中，忽略关闭请求');
+      return;
+    }
+    console.log('[window] close');
+  });
 
-mainWindow.on('closed', () => {
-  console.log('[window] closed');
-  mainWindow = null;
-});
+  mainWindow.on('closed', () => {
+    console.log('[window] closed');
+    mainWindow = null;
+  });
 
   // 外部链接一律走系统浏览器，但只放行 http/https
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -457,10 +467,14 @@ ipcMain.handle('screen:capture', async () => {
   });
   if (!sources.length) return { ok: false, error: '没有找到可截取的屏幕' };
 
-  const source = sources.find((s) => String(s.display_id) === String(display.id)) || sources[0];
+  const matched = sources.find((s) => String(s.display_id) === String(display.id));
+  // 对不上时回落到第一个源（通常主屏），但明确告诉渲染层，
+  // 免得用户以为截到了副屏实际上截错屏（R5-8）
+  const source = matched || sources[0];
   return {
     ok: true,
     name: source.name,
+    matched: !!matched,
     dataUrl: source.thumbnail.toDataURL('image/png')
   };
 });

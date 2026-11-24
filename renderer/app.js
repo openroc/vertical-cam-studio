@@ -1261,6 +1261,9 @@ async function doScreenCapture() {
     }
     await loadImageIntoCropper(res.dataUrl, NaN);
     setFooter(`已截取屏幕：${res.name}`);
+    if (res.matched === false) {
+      toast(`已截取「${res.name}」，但未能精确匹配鼠标所在屏幕，请核对截图内容`, 'err');
+    }
   } catch (err) {
     toast(`屏幕截图失败：${err.message}`, 'err');
   }
