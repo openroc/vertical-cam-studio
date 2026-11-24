@@ -26,6 +26,8 @@ const state = {
   hasImage: false,
   /** 工作区形态：capture = 左主右栏；edit = 左栏右主 */
   workspaceMode: 'capture',
+  /** 固定交互模式：select = 截取（默认）；pan = 拖动。点击模式徽标切换，Ctrl 按住为临时反向 */
+  interactionMode: 'select',
   saveCounter: 0,
   toastTimer: null
 };
@@ -609,8 +611,8 @@ function endPan(e) {
     cropper.pointers = {};
   }
 
-  // 还原成裁剪模式（Ctrl 松开后即为截取模式）
-  setDragMode('crop');
+  // 还原到当前生效模式：固定拖动态保持 move，否则回 crop
+  setDragMode(currentInteractionMode() === 'pan' ? 'move' : 'crop');
 }
 
 /* ------------------------------------------------------------------ */
@@ -760,9 +762,17 @@ function resetCropBox() {
 }
 
 /* ------------------------------------------------------------------ */
-/* 模式提示：按住 Ctrl = 拖动画面；松开 Ctrl = 拉选取框                 */
+/* 模式提示：点击徽标固定模式；按住 Ctrl 临时切到另一种模式            */
 /* ------------------------------------------------------------------ */
 
+/** 当前生效模式：Ctrl 按住时临时反向，否则用点击固定的模式 */
+function currentInteractionMode() {
+  return pan.ctrlDown
+    ? (state.interactionMode === 'pan' ? 'select' : 'pan')
+    : state.interactionMode;
+}
+
+/** 只更新徽标与光标提示的显示（不改动任何状态） */
 function setInteractionMode(mode) {
   const badge = $('#modeBadge');
   if (!badge) return;
@@ -773,16 +783,29 @@ function setInteractionMode(mode) {
   $('#cropStage').classList.toggle('select-mode', !panMode);
 }
 
+/** 按当前生效模式刷新显示（Ctrl 变化、点击切换后调用） */
+function refreshInteractionMode() {
+  setInteractionMode(currentInteractionMode());
+  // 固定模式下拖动结束要保持 move 光标；切回截取才恢复 crop
+  setDragMode(currentInteractionMode() === 'pan' ? 'move' : 'crop');
+}
+
 function bindModeIndicator() {
-  setInteractionMode('select');
+  state.interactionMode = 'select';
+  refreshInteractionMode();
+
+  // 点击徽标：固定模式在截取/拖动之间切换，再点切回
+  $('#modeBadge').addEventListener('click', () => {
+    state.interactionMode = state.interactionMode === 'pan' ? 'select' : 'pan';
+    refreshInteractionMode();
+  });
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Control' || e.ctrlKey) {
       if (!pan.ctrlDown) {
         pan.ctrlDown = true;
-        setInteractionMode('pan');
+        refreshInteractionMode();
       }
-      // 松开 Ctrl 时如果正在平移，立即收尾，避免模式与实际状态不一致
     }
   });
 
@@ -790,7 +813,7 @@ function bindModeIndicator() {
     if (e.key === 'Control' || !e.ctrlKey) {
       if (pan.ctrlDown) {
         pan.ctrlDown = false;
-        setInteractionMode('select');
+        refreshInteractionMode();
         if (pan.dragging) endPan(e);
       }
     }
@@ -799,7 +822,7 @@ function bindModeIndicator() {
   window.addEventListener('blur', () => {
     if (pan.ctrlDown) {
       pan.ctrlDown = false;
-      setInteractionMode('select');
+      refreshInteractionMode();
     }
   });
 }
@@ -817,14 +840,14 @@ function bindStageInteractions() {
   stage.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // 按下左键：
-  //   Ctrl + 拖动  → 平移画面
-  //   普通拖动     → 拉选新的截取框（落在控制点上时交给 cropper 原生缩放）
+  //   当前模式为 pan（点击固定，或 Ctrl 临时反向） → 平移画面
+  //   当前模式为 select                          → 拉选新的截取框（控制点交给 cropper 原生缩放）
   stage.addEventListener('pointerdown', (e) => {
     if (pan.synthetic) return;
     if (e.button !== 0) return;
     if (!state.cropper) return;
 
-    if (e.ctrlKey) {
+    if (currentInteractionMode() === 'pan') {
       e.preventDefault();
       e.stopPropagation();
       beginPan(e);

@@ -1054,6 +1054,44 @@ async function runSmokeTest() {
     console.log('[smoke] 拖动后框选:', JSON.stringify(panSelectProbe));
     const panSelectOk = !!(panSelectProbe && panSelectProbe.followOk && panSelectProbe.inViewOk);
 
+    // 模式徽标点击切换：固定模式可点击切换/切回，Ctrl 临时反向后回到固定模式
+    const modeToggleProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
+      const badge = document.querySelector('#modeBadge');
+      const text = () => badge.textContent;
+      const dragMode = () => window.__wb.getCropper() ? window.__wb.getCropper().options.dragMode : null;
+      const key = (type, down) => window.dispatchEvent(new KeyboardEvent(type, {
+        key: 'Control', ctrlKey: down, bubbles: true
+      }));
+      const click = () => badge.click();
+      const out = {};
+
+      // 先复位到固定截取
+      if (text().indexOf('拖动') >= 0) click();
+      out.baseSelect = text().indexOf('截取') >= 0 && dragMode() === 'crop';
+
+      click(); // → 固定拖动
+      out.clickedPan = text().indexOf('拖动') >= 0 && dragMode() === 'move';
+
+      key('keydown', true); // 固定 pan 下 Ctrl 临时反向 → 截取
+      out.ctrlFromPan = text().indexOf('截取') >= 0 && dragMode() === 'crop';
+      key('keyup', false);  // 松开回到固定 pan
+      out.ctrlBackToPan = text().indexOf('拖动') >= 0 && dragMode() === 'move';
+
+      click(); // → 固定截取
+      out.clickedBackSelect = text().indexOf('截取') >= 0 && dragMode() === 'crop';
+
+      key('keydown', true); // 固定 select 下 Ctrl 临时 → 拖动
+      out.ctrlFromSelect = text().indexOf('拖动') >= 0 && dragMode() === 'move';
+      key('keyup', false);
+      out.ctrlBackToSelect = text().indexOf('截取') >= 0 && dragMode() === 'crop';
+
+      // 结束时确保停在固定截取，避免影响后续探针
+      if (text().indexOf('拖动') >= 0) click();
+      return out;
+    })()`);
+    const modeToggleOk = !!(modeToggleProbe && Object.values(modeToggleProbe).every(Boolean));
+    console.log('[smoke] 模式点击切换:', JSON.stringify({ ...modeToggleProbe, modeToggleOk }));
+
     // 白板模式验证：灰度化 + 对比度增强 + 二值化
     const whiteboardProbe = await getMainWindow().webContents.executeJavaScript(`(async () => {
       const stats = (canvas) => {
@@ -1373,6 +1411,8 @@ async function runSmokeTest() {
       selectOk,
       panSelectProbe,
       panSelectOk,
+      modeToggleProbe,
+      modeToggleOk,
       whiteboardProbe,
       whiteboardOk,
       reloadProbe,
@@ -1398,11 +1438,11 @@ async function runSmokeTest() {
     fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 2));
     console.log('[smoke] 报告已写入:', path.join(outDir, 'report.json'));
 
-    const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && whiteboardOk
+    const allOk = probe.cropperLoaded && fileOk && panOk && selectOk && panSelectOk && modeToggleOk && whiteboardOk
       && reloadOk && settingsOk && rejectOk && usageOk && settingsWindowOk && outputLayoutOk && windowControlsOk && workspaceOk;
     console.log('[smoke] 汇总:', JSON.stringify({
       cropperLoaded: probe.cropperLoaded,
-      fileOk, panOk, selectOk, panSelectOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
+      fileOk, panOk, selectOk, panSelectOk, modeToggleOk, whiteboardOk, reloadOk, settingsOk, rejectOk, usageOk,
       settingsWindowOk, outputLayoutOk, windowControlsOk, workspaceOk, allOk
     }));
     app.exit(allOk ? 0 : 2);

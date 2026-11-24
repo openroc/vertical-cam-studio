@@ -274,7 +274,7 @@ input[type="range"] { padding: 0; width: 140px; accent-color: var(--accent); }
   font-weight: 600;
   letter-spacing: .3px;
   pointer-events: auto;
-  cursor: help;
+  cursor: pointer;
   user-select: none;
   transition: background .12s, border-color .12s, color .12s;
   background: rgba(76, 141, 255, .16);
